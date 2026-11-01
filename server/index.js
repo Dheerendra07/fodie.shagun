@@ -259,8 +259,29 @@ app.post("/api/newsletter", (req, res) => {
 });
 
 app.use("/api", (req, res) => res.status(404).json({ error: "API route not found." }));
-app.use(express.static(ROOT, { dotfiles: "deny", index: "index.html", maxAge: process.env.NODE_ENV === "production" ? "1h" : 0 }));
-app.get("*", (req, res) => res.sendFile(path.join(ROOT, "index.html")));
+
+// Only publish the intentional frontend folders and brand assets.
+// Never expose the project root: the SQLite database lives under server/data.
+const staticOptions = {
+  dotfiles: "deny",
+  index: false,
+  maxAge: process.env.NODE_ENV === "production" ? "1h" : 0
+};
+app.use("/assets", express.static(path.join(ROOT, "assets"), staticOptions));
+app.use("/data", express.static(path.join(ROOT, "data"), staticOptions));
+
+const publicLogoFiles = new Set([
+  "FoodieHub_Logo_Dark.svg",
+  "FoodieHub_Logo_Light.svg",
+  "FoodieHub_Logo_Icon.svg"
+]);
+app.get("/:filename", (req, res, next) => {
+  if (!publicLogoFiles.has(req.params.filename)) return next();
+  return res.sendFile(path.join(ROOT, req.params.filename));
+});
+app.get("/", (req, res) => res.sendFile(path.join(ROOT, "index.html")));
+app.get("/index.html", (req, res) => res.sendFile(path.join(ROOT, "index.html")));
+app.use((req, res) => res.status(404).send("Not found."));
 
 app.use((error, req, res, next) => {
   const status = Number(error.status) || (error.message && error.message.includes("origin is not allowed") ? 403 : 500);
