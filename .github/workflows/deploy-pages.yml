@@ -31,24 +31,39 @@ jobs:
           enablement: true
 
       - name: Prepare static website
+        shell: bash
         run: |
+          set -euo pipefail
           mkdir -p _site
           cp index.html FoodieHub_Logo_Dark.svg FoodieHub_Logo_Light.svg FoodieHub_Logo_Icon.svg _site/
           cp foodiehub-ui-refinement.css _site/
           cp .nojekyll _site/.nojekyll
           python - <<'PY'
           from pathlib import Path
+          import re
+
           page = Path("_site/index.html")
           html = page.read_text(encoding="utf-8")
-          stylesheet = '  <link rel="stylesheet" href="foodiehub-ui-refinement.css">\n'
-          if "foodiehub-ui-refinement.css" not in html:
-              if "</head>" not in html:
+          link = '<link rel="stylesheet" href="foodiehub-ui-refinement.css?v=2">'
+
+          # Check for the actual stylesheet link, not merely the filename anywhere in the app.
+          linked = re.search(
+              r'<link\b[^>]*href=["\'](?:\./)?foodiehub-ui-refinement\.css(?:\?[^"\']*)?["\']',
+              html,
+              flags=re.IGNORECASE,
+          )
+          if not linked:
+              if not re.search(r'</head\s*>', html, flags=re.IGNORECASE):
                   raise SystemExit("Could not find </head> in index.html")
-              html = html.replace("</head>", stylesheet + "</head>", 1)
+              html = re.sub(r'</head\s*>', '  ' + link + '\n</head>', html, count=1, flags=re.IGNORECASE)
+
+          if not re.search(r'href=["\'](?:\./)?foodiehub-ui-refinement\.css(?:\?[^"\']*)?["\']', html, flags=re.IGNORECASE):
+              raise SystemExit("Stylesheet link injection failed")
           page.write_text(html, encoding="utf-8")
           PY
           test -s _site/index.html
           test -s _site/foodiehub-ui-refinement.css
+          grep -qi 'foodiehub-ui-refinement.css' _site/index.html
 
       - name: Upload website artifact
         uses: actions/upload-pages-artifact@v4
