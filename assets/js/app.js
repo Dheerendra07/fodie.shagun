@@ -1171,7 +1171,7 @@
       slide.classList.toggle("is-active",active);
       slide.setAttribute("aria-hidden",String(!active));
     });
-    $("#offerCarousel [data-offer-dot]").forEach(button=>{
+    $("[data-offer-dot]", $("#offerCarousel")).forEach(button=>{
       button.setAttribute("aria-pressed",String(Number(button.dataset.offerDot)===offerSlideIndex));
     });
     $("#offerSlideCount").innerHTML=String(offerSlideIndex+1).padStart(2,"0")+' <i>/</i> '+String(slides.length).padStart(2,"0");
@@ -1212,13 +1212,13 @@
     renderOfferSlide(0);
     $("#offerPrevious").addEventListener("click",()=>{renderOfferSlide(offerSlideIndex-1,true);resumeOfferRotation();});
     $("#offerNext").addEventListener("click",()=>{renderOfferSlide(offerSlideIndex+1,true);resumeOfferRotation();});
-    $("#offerCarousel [data-offer-dot]").forEach(button=>button.addEventListener("click",()=>{
+    $("[data-offer-dot]", $("#offerCarousel")).forEach(button=>button.addEventListener("click",()=>{
       renderOfferSlide(Number(button.dataset.offerDot),true);resumeOfferRotation();
     }));
-    $("#offerCarousel [data-use-offer]").forEach(button=>button.addEventListener("click",()=>{
+    $("[data-use-offer]", $("#offerCarousel")).forEach(button=>button.addEventListener("click",()=>{
       applyOfferCode(button.dataset.useOffer);
     }));
-    $("#offerCarousel [data-shop-offer]").forEach(button=>button.addEventListener("click",()=>{
+    $("[data-shop-offer]", $("#offerCarousel")).forEach(button=>button.addEventListener("click",()=>{
       $("#menu").scrollIntoView({behavior:"smooth",block:"start"});
       showToast("Free delivery is automatically applied on orders of ₹499 or more.");
     }));
