@@ -230,7 +230,7 @@
       phone,
       email: String(form.get("email") || "").trim(),
       addressDetails,
-      address: formatDeliveryAddress(addressDetails)
+      address: formatDeliveryAddress(addressDetails) || state.profile.address || ""
     };
     saveStore(STORAGE.profile, state.profile);
     renderProfile();
