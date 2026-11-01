@@ -839,12 +839,12 @@
     form.reset();
     $("#trackingError").textContent="";
     $("#trackingResult").hidden=true;
-    const phone=String(state.profile.phone||"").replace(/\\D/g,"").slice(-10);
+    const phone=String(state.profile.phone||"").replace(/\D/g,"").slice(-10);
     form.elements.namedItem("phone").value=phone;
     $("#trackingHelper").textContent=phone
       ?"Mobile number filled from your profile. Check that it matches the number used when placing the order."
       :"Save your checkout mobile in Profile, or enter it below to verify your order.";
-    const matches=phone?state.orders.filter(order=>String(order.phone||(order.customer&&order.customer.phone)||"").replace(/\\D/g,"").slice(-10)===phone).slice().sort((a,b)=>new Date(b.createdAt||b.created_at||0)-new Date(a.createdAt||a.created_at||0)).slice(0,6):[];
+    const matches=phone?state.orders.filter(order=>String(order.phone||(order.customer&&order.customer.phone)||"").replace(/\D/g,"").slice(-10)===phone).slice().sort((a,b)=>new Date(b.createdAt||b.created_at||0)-new Date(a.createdAt||a.created_at||0)).slice(0,6):[];
     const select=$("#trackingRecentSelect");
     select.innerHTML='<option value="">Choose an order (optional)</option>'+matches.map(order=>{
       const number=String(order.orderNumber||order.order_number||"");
