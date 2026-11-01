@@ -39,6 +39,7 @@ jobs:
           set -euo pipefail
           node --check server/index.js
           node --check assets/js/app.js
+          node --check fittrack/app.js
           node -e "JSON.parse(require('fs').readFileSync('data/menu.json', 'utf8'))"
 
       - name: Prepare static website
