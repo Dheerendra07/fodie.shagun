@@ -503,8 +503,8 @@ h1 em, h2 em { color: var(--orange); font-family: var(--display); font-weight: 6
 :root[data-theme="dark"] .profile-trigger { background: var(--card); color: var(--ink); }
 :root[data-theme="dark"] .profile-intro { background: var(--paper-deep); }
 @media (max-width: 760px) {
-  .profile-trigger { width: 37px; min-height: 37px; padding: 0; }
-  .profile-trigger-label { display: none; }
+  .profile-trigger { width: auto; min-height: 37px; padding: 0 10px; }
+  .profile-trigger-label { display: inline; font-size: 10px; }
   .profile-dialog .dialog-header, .profile-form { padding-right: 18px; padding-left: 18px; }
 }
 @media (max-width: 390px) {
