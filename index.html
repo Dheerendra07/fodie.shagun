@@ -13,7 +13,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="preconnect" href="https://images.unsplash.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./assets/css/styles.css">
   <script src="./assets/js/config.js"></script>
   <script defer src="./assets/js/app.js"></script>
@@ -53,6 +53,10 @@
         </button>
         <button class="icon-button favourite-shortcut" id="favouritesToggle" type="button" aria-label="Show favourites" title="Your favourites">
           <span aria-hidden="true">♡</span>
+        </button>
+        <button class="profile-trigger" id="openProfile" type="button" aria-label="Open your profile" title="Your profile">
+          <span class="profile-icon" aria-hidden="true">♙</span>
+          <span class="profile-trigger-label" id="profileTriggerLabel">Profile</span>
         </button>
         <button class="cart-trigger" id="openCart" type="button" aria-label="Open shopping bag">
           <span class="bag-icon" aria-hidden="true">▱</span>
@@ -261,6 +265,7 @@
         <label class="form-field form-field-full">Email address <span class="optional-label">Optional</span><input name="email" type="email" placeholder="you@example.com" autocomplete="email"></label>
         <label class="form-field form-field-full">Delivery address<textarea name="address" placeholder="House / flat, street, area, city and PIN code" minlength="12" rows="3" required autocomplete="street-address"></textarea></label>
       </div>
+      <label class="save-profile-choice"><input id="saveCheckoutProfile" type="checkbox" checked><span><strong>Save these details to my profile</strong><small>So your next order is quicker.</small></span></label>
       <div class="form-intro payment-intro"><span>02</span><div><strong>How would you like to pay?</strong><small>No real online payment is collected in this demo.</small></div></div>
       <div class="payment-choice">
         <label><input type="radio" name="paymentMethod" value="cod" checked><span class="payment-card-icon">₹</span><span><strong>Cash on delivery</strong><small>Pay when your order arrives</small></span><i></i></label>
@@ -270,6 +275,33 @@
       <p class="form-error" id="checkoutError" role="alert"></p>
       <button class="button button-primary place-order-button" type="submit">Place my order <span aria-hidden="true">↗</span></button>
       <p class="demo-disclaimer">This project does not process card payments. Orders are stored by the connected demo backend when it is online.</p>
+    </form>
+  </dialog>
+
+  <dialog class="site-dialog profile-dialog" id="profileDialog" aria-labelledby="profileTitle">
+    <div class="dialog-header">
+      <div><span class="drawer-kicker">YOUR FOODIEHUB SPACE</span><h2 id="profileTitle">Your profile.</h2></div>
+      <button class="close-button" type="button" data-close-dialog="profileDialog" aria-label="Close profile">×</button>
+    </div>
+    <form id="profileForm" class="checkout-form profile-form">
+      <div class="profile-intro">
+        <span class="profile-avatar" aria-hidden="true">♙</span>
+        <div><strong>Your details, ready when you are.</strong><small>Save them once and checkout becomes quicker.</small></div>
+      </div>
+      <div class="form-intro"><span>01</span><div><strong>Personal details</strong><small>Your details are saved on this browser.</small></div></div>
+      <div class="form-grid">
+        <label class="form-field">Full name<input name="name" type="text" placeholder="Your name" minlength="2" autocomplete="name"></label>
+        <label class="form-field">Mobile number<input name="phone" type="tel" placeholder="10-digit mobile number" inputmode="numeric" pattern="[6-9][0-9]{9}" minlength="10" maxlength="10" autocomplete="tel"></label>
+        <label class="form-field form-field-full">Email address <span class="optional-label">Optional</span><input name="email" type="email" placeholder="you@example.com" autocomplete="email"></label>
+      </div>
+      <div class="form-intro address-intro"><span>02</span><div><strong>Saved delivery address</strong><small>Use this as your default address at checkout.</small></div></div>
+      <label class="form-field">House / flat, street, area, city and PIN code
+        <textarea name="address" placeholder="e.g. Flat 2B, Park Street, Meerut, Uttar Pradesh - 250001" minlength="12" rows="3" autocomplete="street-address"></textarea>
+      </label>
+      <p class="profile-storage-note"><span aria-hidden="true">⌂</span> Profile and address are stored only in this browser. This is a demo profile, not a sign-in account.</p>
+      <p class="form-error" id="profileError" role="alert"></p>
+      <button class="button button-primary profile-save-button" type="submit">Save profile <span aria-hidden="true">✓</span></button>
+      <p class="profile-message" id="profileMessage" aria-live="polite"></p>
     </form>
   </dialog>
 
