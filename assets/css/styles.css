@@ -1880,3 +1880,6 @@ h1 em,h2 em {
 .admin-analytics-overview{grid-template-columns:1fr}.admin-current-period{grid-column:auto}
 .admin-chart-header{align-items:flex-start;flex-direction:column}.admin-chart-footnote{align-items:flex-start;flex-direction:column}
 }
+
+/* Hide the admin credential form in local demo mode; analytics open immediately. */
+.admin-login-form[hidden]{display:none!important}
