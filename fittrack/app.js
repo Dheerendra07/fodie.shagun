@@ -1,24 +1,33 @@
 const $ = (s, root=document) => root.querySelector(s);
 const $$ = (s, root=document) => [...root.querySelectorAll(s)];
 const KEY = "fittrack-data-v1";
-const initial = {water:4, calories:1240, protein:62, weight:66, goalWeight:62, workoutsDone:2, completed:[], food:[{name:"Banana shake",detail:"Milk · banana · roasted chana",calories:380,protein:16,emoji:"🥤"},{name:"Dal & rice",detail:"Lunch",calories:420,protein:17,emoji:"🍚"},{name:"Eggs & curd",detail:"Evening meal",calories:310,protein:25,emoji:"🥚"}], history:[{day:"Mon",value:35},{day:"Tue",value:65},{day:"Wed",value:45},{day:"Thu",value:80},{day:"Fri",value:55},{day:"Sat",value:25},{day:"Sun",value:15}]};
+const initial = {profileName:"Your fitness space",water:4, calories:1240, protein:62, weight:66, goalWeight:62, workoutsDone:2, completed:[], setsCompleted:{}, food:[{name:"Banana shake",detail:"Milk · banana · roasted chana",calories:380,protein:16,emoji:"🥤"},{name:"Dal & rice",detail:"Lunch",calories:420,protein:17,emoji:"🍚"},{name:"Eggs & curd",detail:"Evening meal",calories:310,protein:25,emoji:"🥚"}], history:[{day:"Mon",value:35},{day:"Tue",value:65},{day:"Wed",value:45},{day:"Thu",value:80},{day:"Fri",value:55},{day:"Sat",value:25},{day:"Sun",value:15}]};
 let data;
 try { data = {...initial, ...JSON.parse(localStorage.getItem(KEY) || "{}")}; } catch { data = {...initial}; }
 let currentView = "overview", toastTimer;
 const workouts = [
-  {name:"Bench Press",group:"Chest",sets:"3 sets × 12 reps",emoji:"🏋️"},
-  {name:"Incline Dumbbell Press",group:"Chest",sets:"3 sets × 12 reps",emoji:"💪"},
-  {name:"Cable Fly",group:"Chest",sets:"3 sets × 15 reps",emoji:"🔩"},
-  {name:"Triceps Pushdown",group:"Triceps",sets:"3 sets × 12 reps",emoji:"⚡"},
-  {name:"Lat Pulldown",group:"Back",sets:"3 sets × 12 reps",emoji:"🧗"},
-  {name:"Seated Cable Row",group:"Back",sets:"3 sets × 12 reps",emoji:"🚣"},
-  {name:"Shoulder Press",group:"Shoulders",sets:"3 sets × 12 reps",emoji:"🏋️"},
-  {name:"Lateral Raises",group:"Shoulders",sets:"3 sets × 15 reps",emoji:"🪽"},
-  {name:"Squats",group:"Legs",sets:"3 sets × 12 reps",emoji:"🦵"},
-  {name:"Romanian Deadlift",group:"Legs",sets:"3 sets × 12 reps",emoji:"⚡"},
-  {name:"Bicep Curls",group:"Arms",sets:"3 sets × 12 reps",emoji:"💪"},
-  {name:"Plank",group:"Core",sets:"3 sets × 45 sec",emoji:"🧘"}
+  {name:"Bench Press",group:"Chest",emoji:"🏋️"},
+  {name:"Incline Dumbbell Press",group:"Chest",emoji:"💪"},
+  {name:"Cable Fly",group:"Chest",emoji:"🔩"},
+  {name:"Lat Pulldown",group:"Back",emoji:"🧗"},
+  {name:"Seated Cable Row",group:"Back",emoji:"🚣"},
+  {name:"Romanian Deadlift",group:"Back",emoji:"⚡"},
+  {name:"Shoulder Press",group:"Shoulders",emoji:"🏋️"},
+  {name:"Lateral Raises",group:"Shoulders",emoji:"🪽"},
+  {name:"Squats",group:"Legs",emoji:"🦵"},
+  {name:"Leg Press",group:"Legs",emoji:"🏋️"},
+  {name:"Bicep Curls",group:"Biceps",emoji:"💪"},
+  {name:"Hammer Curls",group:"Biceps",emoji:"🔨"},
+  {name:"Preacher Curls",group:"Biceps",emoji:"💪"},
+  {name:"Triceps Pushdown",group:"Triceps",emoji:"⚡"},
+  {name:"Overhead Triceps Extension",group:"Triceps",emoji:"🏋️"},
+  {name:"Close-Grip Press",group:"Triceps",emoji:"💪"}
 ];
+const repScheme = [20,15,12,12,12];
+data.setsCompleted = data.setsCompleted || {};
+for (const name of data.completed || []) {
+  if (!data.setsCompleted[name]) data.setsCompleted[name] = [true,true,true,true,true];
+}
 const viewNames = {overview:"Overview",workouts:"Workouts",nutrition:"Nutrition",hydration:"Hydration",progress:"Progress"};
 function save(){localStorage.setItem(KEY,JSON.stringify(data));}
 function notify(message){const el=$("#toast");el.textContent=message;el.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove("show"),2300);}
@@ -41,14 +50,21 @@ function renderOverview(){
  card('Your weekly movement',chart(),'ACTIVITY OVERVIEW','<button class="text-link" data-go="progress">See progress →</button>')+'</div>';
 }
 function renderWorkouts(){
- const groups=['All','Chest','Back','Shoulders','Legs','Arms','Core'];
+ const groups=['All','Chest','Back','Shoulders','Legs','Biceps','Triceps'];
  const selected=window.workoutFilter||'All';
  const list=workouts.filter(w=>selected==='All'||w.group===selected);
- return head('TRAINING SPACE','Your workout planner.','Build a routine that fits your day. Tick off each movement as you complete it.','<button class="ghost-btn" data-action="clear-workout">Reset checklist</button>')+
- '<div class="notice">💡 <b>Keep it smart:</b> Warm up first, use controlled form, and choose a weight you can lift safely. Rest between sets.</div>'+
+ const cards=list.map(w=>{
+   const checks=data.setsCompleted[w.name]||[false,false,false,false,false];
+   const done=checks.filter(Boolean).length;
+   const setRows=repScheme.map((reps,i)=>'<label class="set-row '+(checks[i]?'done':'')+'"><span>SET '+(i+1)+'</span><strong>'+reps+' reps</strong><input type="checkbox" data-set-index="'+i+'" data-set-exercise="'+escapeHtml(w.name)+'" '+(checks[i]?'checked':'')+' aria-label="Mark set '+(i+1)+' complete for '+escapeHtml(w.name)+'"></label>').join('');
+   return '<article class="exercise-card"><div class="emoji">'+w.emoji+'</div><h3>'+w.name+'</h3><p>'+w.group+' · 5 sets · Rep scheme 20 / 15 / 12 / 12 / 12</p><div class="set-count">'+done+'/5 sets completed</div><div class="set-tracker">'+setRows+'</div><div class="meter"><span style="width:'+Math.round(done/5*100)+'%"></span></div></article>';
+ }).join('');
+ const completedCount=workouts.filter(w=>(data.setsCompleted[w.name]||[]).filter(Boolean).length===5).length;
+ return head('TRAINING SPACE','Your workout planner.','Every exercise has 5 trackable sets. Tick a set when you finish it.','<button class="ghost-btn" data-action="clear-workout">Reset checklist</button>')+
+ '<div class="notice">💡 <b>Rep plan:</b> Set 1 = 20 reps, Set 2 = 15 reps, Sets 3–5 = 12 reps each. Warm up first, use controlled form and choose a manageable weight. Adjust reps or load to your ability and training guidance.</div>'+
  '<div class="chips filter-chips" style="margin-bottom:15px">'+groups.map(g=>'<button class="chip filter-chip '+(selected===g?'selected':'')+'" data-filter="'+g+'">'+g+'</button>').join('')+'</div>'+
- '<div class="exercise-grid">'+list.map(w=>'<article class="exercise-card"><div class="emoji">'+w.emoji+'</div><h3>'+w.name+'</h3><p>'+w.group+' · '+w.sets+'</p><button class="exercise-status '+(data.completed.includes(w.name)?'done':'')+'" data-exercise="'+w.name+'">'+(data.completed.includes(w.name)?'✓ Completed':'Mark complete')+'</button></article>').join('')+'</div>'+
- '<div class="section-title">Session summary</div><div class="card"><div class="row-note"><div><div class="card-title">'+data.completed.length+' exercises completed</div><div class="card-subtitle">Your checklist is saved in this browser.</div></div><button class="primary-btn" data-action="finish-workout">Finish session ✓</button></div>'+meter(data.completed.length,workouts.length)+'</div>';
+ '<div class="exercise-grid">'+cards+'</div>'+
+ '<div class="section-title">Session summary</div><div class="card"><div class="row-note"><div><div class="card-title">'+completedCount+' / '+workouts.length+' exercises completed</div><div class="card-subtitle">Your set-by-set checklist is saved in this browser.</div></div><button class="primary-btn" data-action="finish-workout">Finish session ✓</button></div>'+meter(completedCount,workouts.length)+'</div>';
 }
 function renderNutrition(){
  return head('FUEL YOUR BODY','Nutrition, without the guesswork.','Track meals and get a clearer picture of your daily fuel.','<button class="ghost-btn" data-action="clear-food">Clear today’s log</button>')+
@@ -68,7 +84,37 @@ function renderProgress(){
  card('Update your weight','<form id="weight-form"><div class="field"><label for="weight-value">CURRENT WEIGHT (KG)</label><input id="weight-value" name="weight" type="number" min="20" max="350" step=".1" required value="'+data.weight+'"></div><div class="field" style="margin-top:12px"><label for="goal-weight">GOAL WEIGHT (KG)</label><input id="goal-weight" name="goal" type="number" min="20" max="350" step=".1" required value="'+data.goalWeight+'"></div><div class="form-actions"><button class="primary-btn" type="submit">Save check-in</button></div></form>','YOUR CHECK-IN')+'</div>'+
  '<div class="section-title">Consistency checklist</div><div class="card"><div class="exercise-list">'+[['🏋️','Move your body','A workout or a walk counts.'],['🥗','Fuel your recovery','Aim for balanced meals and enough protein.'],['💧','Drink water regularly','Build a routine that suits your day.'],['😴','Make room for rest','Recovery is part of training.']].map(x=>'<div class="exercise-row"><div class="exercise-symbol">'+x[0]+'</div><div class="exercise-main"><b>'+x[1]+'</b><small>'+x[2]+'</small></div><span class="chip">Habit</span></div>').join('')+'</div></div>';
 }
+function syncProfile(){
+ const name=(data.profileName||'Your fitness space').trim()||'Your fitness space';
+ const initialLetter=name.charAt(0).toUpperCase();
+ $('#profile-name').textContent=name;
+ $('#profile-avatar').textContent=initialLetter;
+ $('#profile-modal-avatar').textContent=initialLetter;
+ $('#profile-modal-preview').textContent=name;
+ $('#open-profile-top').textContent=initialLetter;
+}
+function openProfile(){
+ $('#profile-display-name').value=data.profileName||'Your fitness space';
+ $('#profile-modal').hidden=false;
+ $('#profile-menu').hidden=true;
+ $('#profile-menu-toggle').setAttribute('aria-expanded','false');
+ setTimeout(()=>$('#profile-display-name').focus(),0);
+}
+function closeProfile(){ $('#profile-modal').hidden=true; }
+function closeProfileMenu(){ $('#profile-menu').hidden=true; $('#profile-menu-toggle').setAttribute('aria-expanded','false'); }
+function exportData(){
+ const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+ const url=URL.createObjectURL(blob);const a=document.createElement('a');
+ a.href=url;a.download='fittrack-progress.json';a.click();URL.revokeObjectURL(url);
+ notify('Your data export is ready.');
+}
+function resetAppData(){
+ if(confirm('Reset all FitTrack data in this browser?')){
+   data=JSON.parse(JSON.stringify(initial));save();render();syncProfile();closeProfileMenu();notify('FitTrack data has been reset.');
+ }
+}
 function render(){
+ syncProfile();
  $('#crumb').textContent=viewNames[currentView];
  $$('.nav-item').forEach(b=>b.classList.toggle('active',b.dataset.view===currentView));
  const views={overview:renderOverview,workouts:renderWorkouts,nutrition:renderNutrition,hydration:renderHydration,progress:renderProgress};
@@ -77,6 +123,16 @@ function render(){
 function go(view){if(!viewNames[view])return;currentView=view;render();window.scrollTo({top:0,behavior:'smooth'});}
 function waterChange(n){data.water=Math.max(0,Math.min(30,data.water+n));save();render();notify(n>0?'Water logged. Nice work!':'Water entry adjusted.');}
 document.addEventListener('click',e=>{
+ const setToggle=e.target.closest('[data-set-index]');
+ if(setToggle){
+   const name=setToggle.dataset.setExercise,index=Number(setToggle.dataset.setIndex);
+   if(!data.setsCompleted[name])data.setsCompleted[name]=[false,false,false,false,false];
+   data.setsCompleted[name][index]=setToggle.checked;
+   const allDone=repScheme.every((_,i)=>data.setsCompleted[name][i]);
+   if(allDone&&!data.completed.includes(name))data.completed.push(name);
+   if(!allDone)data.completed=data.completed.filter(x=>x!==name);
+   save();render();notify(setToggle.checked?'Set marked complete ✓':'Set unchecked');return;
+ }
  const nav=e.target.closest('[data-view]');if(nav){go(nav.dataset.view);return;}
  const goBtn=e.target.closest('[data-go]');if(goBtn){go(goBtn.dataset.go);return;}
  const filter=e.target.closest('[data-filter]');if(filter){window.workoutFilter=filter.dataset.filter;render();return;}
@@ -85,14 +141,41 @@ document.addEventListener('click',e=>{
  if(action==='water-plus')waterChange(1);
  if(action==='water-minus')waterChange(-1);
  if(action==='water-reset'){data.water=0;save();render();notify('Water tracker reset.');}
- if(action==='clear-workout'){data.completed=[];save();render();notify('Workout checklist reset.');}
- if(action==='finish-workout'){if(!data.completed.length){notify('Tick off at least one exercise first.');return;}data.workoutsDone=Math.min(7,data.workoutsDone+1);data.history[6].value=Math.min(100,data.history[6].value+20);save();render();notify('Session saved. Great job!');}
+ if(action==='clear-workout'){data.completed=[];data.setsCompleted={};save();render();notify('Workout checklist reset.');}
+ if(action==='finish-workout'){const finished=workouts.filter(w=>(data.setsCompleted[w.name]||[]).filter(Boolean).length===5).length;if(!finished){notify('Complete all 5 sets of at least one exercise first.');return;}data.workoutsDone=Math.min(7,data.workoutsDone+1);data.history[6].value=Math.min(100,data.history[6].value+20);save();render();notify('Session saved. Great job!');}
  if(action==='clear-food'){if(confirm('Clear all food entries and reset nutrition totals?')){data.food=[];data.calories=0;data.protein=0;save();render();notify('Food log cleared.');}}
- if(action==='export-data'){const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='fittrack-progress.json';a.click();URL.revokeObjectURL(url);notify('Your data export is ready.');}
+ if(action==='export-data'){exportData();}
 });
 document.addEventListener('submit',e=>{
  if(e.target.id==='food-form'){e.preventDefault();const f=new FormData(e.target);const name=String(f.get('name')).trim(),calories=Number(f.get('calories')),protein=Number(f.get('protein'));if(!name||calories<0||protein<0)return;data.food.push({name,detail:String(f.get('detail')||'Food log').trim()||'Food log',calories,protein,emoji:'🍽️'});data.calories+=calories;data.protein+=protein;save();render();notify('Meal added to your food log!');}
  if(e.target.id==='weight-form'){e.preventDefault();const f=new FormData(e.target);const weight=Number(f.get('weight')),goal=Number(f.get('goal'));if(weight>=20&&weight<=350&&goal>=20&&goal<=350){data.weight=weight;data.goalWeight=goal;save();render();notify('Weight check-in saved.');}}
 });
-$('#reset-demo').addEventListener('click',()=>{if(confirm('Reset all FitTrack demo data in this browser?')){data=JSON.parse(JSON.stringify(initial));save();render();notify('Demo data has been reset.');}});
+$('#reset-demo').addEventListener('click',resetAppData);
+$('#open-profile').addEventListener('click',openProfile);
+$('#open-profile-top').addEventListener('click',openProfile);
+$('#close-profile').addEventListener('click',closeProfile);
+$('#cancel-profile').addEventListener('click',closeProfile);
+$('#profile-modal').addEventListener('click',e=>{if(e.target.id==='profile-modal')closeProfile();});
+$('#profile-menu-toggle').addEventListener('click',e=>{
+ e.stopPropagation();const menu=$('#profile-menu');const opening=menu.hidden;
+ menu.hidden=!opening;$('#profile-menu-toggle').setAttribute('aria-expanded',String(opening));
+});
+$('#profile-menu').addEventListener('click',e=>{
+ const item=e.target.closest('[data-profile-action]');if(!item)return;
+ const action=item.dataset.profileAction;closeProfileMenu();
+ if(action==='edit')openProfile();
+ if(action==='export')exportData();
+ if(action==='reset')resetAppData();
+ if(action==='about')alert('FitTrack is a personal fitness dashboard for workout sets, nutrition, hydration and progress. Your demo data stays in this browser.');
+});
+document.addEventListener('click',e=>{
+ if(!e.target.closest('.profile-wrap'))closeProfileMenu();
+});
+document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeProfile();closeProfileMenu();}});
+document.addEventListener('submit',e=>{
+ if(e.target.id==='profile-form'){
+   e.preventDefault();const name=String(new FormData(e.target).get('displayName')||'').trim();
+   if(!name)return;data.profileName=name;save();syncProfile();closeProfile();notify('Profile saved!');
+ }
+});
 render();
