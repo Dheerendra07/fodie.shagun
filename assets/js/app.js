@@ -486,6 +486,7 @@
     try {
       await Promise.all([checkBackend()]);
       state.menu = await loadMenu();
+      renderCart();
       renderCategories();
       renderMenu();
       if (state.backendOnline) {
