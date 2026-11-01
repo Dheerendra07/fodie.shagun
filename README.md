@@ -44,7 +44,7 @@ For live code reloading during development, run \`npm run dev\`.
 | GET | \`/api/health\` | API and database health |
 | GET | \`/api/menu\` | Menu data |
 | GET | \`/api/categories\` | Menu categories |
-| POST | \`/api/orders\` | Validate prices and save an order |
+| POST | \`/api/orders\` | Validate prices and save a delivery-payment order |
 | GET | \`/api/orders/track?order=...&phone=...\` | Track an order with order number and checkout phone |
 | POST | \`/api/newsletter\` | Save a newsletter email |
 | GET | \`/api/admin/orders\` | Admin order list (protected) |
@@ -69,6 +69,7 @@ GitHub Pages is static hosting. To accept centrally stored orders, deploy this r
 - Set \`DATA_DIR\` to a persistent mounted folder, for example \`/var/data\`, when your hosting plan supports a persistent disk.
 - Set \`ALLOWED_ORIGINS\` to the exact frontend origin, for example \`https://shagun299.github.io\`.
 - Set a long random \`ADMIN_API_KEY\` before using the admin endpoints.
+- To enable online checkout, set \`RAZORPAY_KEY_ID\` and \`RAZORPAY_KEY_SECRET\` as backend environment variables. Start with Razorpay Test Mode keys; use Live Mode keys only after account and website approval.
 
 After the backend is deployed, put its base URL in \`assets/js/config.js\`:
 
@@ -82,7 +83,8 @@ Commit that change and let GitHub Pages deploy again. Do not put \`ADMIN_API_KEY
 
 - If the backend is offline, the website still lets you browse, filter, favourite and build a cart. Checkout then uses a clearly identified browser-only demo order.
 - When the backend is online, orders and newsletter sign-ups are stored in SQLite on the server. Use persistent storage on the hosting provider or orders may be lost when its filesystem is reset.
-- Checkout currently supports cash on delivery and UPI on delivery as demo choices. No card, UPI-app or other online payment is processed.
+- Cash on delivery and UPI on delivery work as delivery-payment choices. Secure online checkout appears only after the separately hosted backend has Razorpay keys configured.
+- Razorpay secrets remain on the backend. The server creates the payment order, verifies the signature and checks the payment amount and order before confirming a captured payment. A GitHub Pages-only deployment cannot process online payments by itself.
 - The menu, photographs, prices, offer rules and brand copy are sample project content. Replace them with verified restaurant information before taking real customer orders.
 
 ## Security notes

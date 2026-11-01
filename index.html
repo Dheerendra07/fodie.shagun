@@ -15,9 +15,9 @@
   <link rel="preconnect" href="https://images.unsplash.com">
   <link rel="preconnect" href="https://images.pexels.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Serif+Display&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./assets/css/styles.css?v=six-features-20261102">
+  <link rel="stylesheet" href="./assets/css/styles.css?v=checkout-glass-fix-20261102">
   <script src="./assets/js/config.js"></script>
-  <script defer src="./assets/js/app.js?v=six-features-final-20261102"></script>
+  <script defer src="./assets/js/app.js?v=checkout-glass-fix-20261102"></script>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -298,15 +298,17 @@
         <label class="form-field form-field-full">Delivery address<textarea name="address" placeholder="House / flat, street, area, city and PIN code" minlength="12" rows="3" required autocomplete="street-address"></textarea></label>
       </div>
       <label class="save-profile-choice"><input id="saveCheckoutProfile" type="checkbox" checked><span><strong>Save these details to my profile</strong><small>So your next order is quicker.</small></span></label>
-      <div class="form-intro payment-intro"><span>02</span><div><strong>How would you like to pay?</strong><small>No real online payment is collected in this demo.</small></div></div>
+      <div class="form-intro payment-intro"><span>02</span><div><strong>How would you like to pay?</strong><small>Choose secure online payment or pay when your order arrives.</small></div></div>
       <div class="payment-choice">
         <label><input type="radio" name="paymentMethod" value="cod" checked><span class="payment-card-icon">₹</span><span><strong>Cash on delivery</strong><small>Pay when your order arrives</small></span><i></i></label>
-        <label><input type="radio" name="paymentMethod" value="upi_at_door"><span class="payment-card-icon">⌁</span><span><strong>UPI on delivery</strong><small>Pay at the door using your UPI app</small></span><i></i></label>
+        <label><input type="radio" name="paymentMethod" value="upi_at_door"><span class="payment-card-icon">⌁</span><span><strong>UPI on delivery</strong><small>Scan and pay at your door</small></span><i></i></label>
+        <label id="onlinePaymentChoice" class="online-payment-choice" hidden><input type="radio" name="paymentMethod" value="razorpay"><span class="payment-card-icon">↗</span><span><strong>Pay online securely</strong><small>UPI, cards, netbanking and more</small></span><i></i></label>
       </div>
+      <p class="payment-availability-note" id="paymentAvailabilityNote" aria-live="polite">Online payments will appear here after the FoodieHub payment backend is connected.</p>
       <div class="checkout-summary"><span>Estimated total</span><strong id="checkoutTotal">₹0</strong></div>
       <p class="form-error" id="checkoutError" role="alert"></p>
       <button class="button button-primary place-order-button" type="submit">Place my order <span aria-hidden="true">↗</span></button>
-      <p class="demo-disclaimer">This project does not process card payments. Orders are stored by the connected demo backend when it is online.</p>
+      <p class="demo-disclaimer" id="checkoutDisclaimer">Cash on delivery and UPI on delivery are available in demo mode. Online payments require a connected Razorpay-enabled backend.</p>
     </form>
   </dialog>
 

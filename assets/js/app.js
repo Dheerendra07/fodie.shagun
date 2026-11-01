@@ -63,7 +63,8 @@
     pendingRewardRedemption: false,
     adminKey: "",
     adminOrders: [],
-    adminSource: "none"
+    adminSource: "none",
+    paymentGateway: { enabled: false, keyId: "" }
   };
 
   function readStore(key, fallback) {
@@ -100,6 +101,13 @@
       await request("/api/health");
       state.backendOnline = true;
       document.documentElement.dataset.backend = "connected";
+      try {
+        const paymentConfig = await request("/api/payments/config");
+        state.paymentGateway = { enabled: Boolean(paymentConfig.enabled && paymentConfig.keyId), keyId: String(paymentConfig.keyId || "") };
+      } catch (_) {
+        state.paymentGateway = { enabled: false, keyId: "" };
+      }
+      renderPaymentAvailability();
     } catch (_) {
       state.backendOnline = false;
       document.documentElement.dataset.backend = "demo";
@@ -131,7 +139,12 @@
 
   function openDialog(id) {
     const dialog = document.getElementById(id);
-    if (dialog && !dialog.open) dialog.showModal();
+    if (!dialog || dialog.open) return;
+    if (typeof dialog.showModal === "function") dialog.showModal();
+    else {
+      dialog.setAttribute("open", "");
+      dialog.classList.add("dialog-fallback-open");
+    }
   }
 
   function closeDialog(id) {
@@ -474,7 +487,10 @@
     const count = bill.lines.reduce((sum, item) => sum + item.quantity, 0);
     $("#cartCount").textContent = count;
     $("#drawerItemCount").textContent = "(" + count + ")";
-    $("#checkoutButton").disabled = count === 0;
+    const checkoutButton = $("#checkoutButton");
+    checkoutButton.disabled = count === 0;
+    checkoutButton.setAttribute("aria-disabled", count === 0 ? "true" : "false");
+    checkoutButton.title = count === 0 ? "Add at least one dish to continue" : "Continue to checkout";
     $("#billSubtotal").textContent = money(bill.subtotal);
     $("#billDiscount").textContent = "−" + money(bill.couponDiscount);
     $("#billDelivery").textContent = bill.delivery ? money(bill.delivery) : (bill.subtotal ? "FREE" : money(0));
@@ -564,16 +580,31 @@
     renderCart();
   }
 
+  function renderPaymentAvailability() {
+    const onlineOption = $("#onlinePaymentChoice");
+    const note = $("#paymentAvailabilityNote");
+    if (!onlineOption || !note) return;
+    onlineOption.hidden = !state.paymentGateway.enabled;
+    note.textContent = state.paymentGateway.enabled
+      ? "Secure online checkout is ready. Payments are verified by the FoodieHub server."
+      : "Online payment is not connected yet. You can still choose Cash on Delivery or UPI on Delivery.";
+  }
+
   function openCheckout() {
-    if (!getCartLines().length) return;
+    if (!getCartLines().length) {
+      showToast("Your bag is empty. Add a dish before checkout.", "error");
+      openCart();
+      return;
+    }
     closeCart();
     $("#checkoutError").textContent = "";
-    $("#checkoutForm").reset();
     const checkoutForm = $("#checkoutForm");
+    checkoutForm.reset();
     ["name", "phone", "email", "address"].forEach(field => {
       checkoutForm.elements.namedItem(field).value = state.profile[field] || "";
     });
     $("#saveCheckoutProfile").checked = true;
+    renderPaymentAvailability();
     renderCart();
     openDialog("checkoutDialog");
   }
@@ -581,6 +612,101 @@
   function saveLocalOrder(order) {
     state.orders.unshift(order);
     saveStore(STORAGE.orders, state.orders.slice(0, 20));
+  }
+
+  function finalizeOrder(order, customer, payload, paymentMode) {
+    const appliedCouponCode = state.coupon ? state.coupon.code : "";
+    if (appliedCouponCode === "REWARD25" && state.pendingRewardRedemption) {
+      state.rewards.points = Math.max(0, Number(state.rewards.points || 0) - 50);
+    }
+    const pointsEarned = Math.max(0, Math.floor(Number(order.total || calculateBill().total) / 10));
+    state.rewards.points = Number(state.rewards.points || 0) + pointsEarned;
+    state.rewards.lifetime = Number(state.rewards.lifetime || 0) + pointsEarned;
+    saveStore(STORAGE.rewards, state.rewards);
+    state.pendingRewardRedemption = false;
+    renderRewards();
+    if ($("#saveCheckoutProfile").checked) {
+      state.profile = customer;
+      saveStore(STORAGE.profile, state.profile);
+      renderProfile();
+    }
+    state.cart = {};
+    state.coupon = null;
+    saveStore(STORAGE.cart, state.cart);
+    renderCart();
+    closeDialog("checkoutDialog");
+    $("#successOrderNumber").textContent = order.orderNumber;
+    const defaultMessage = paymentMode === "online"
+      ? "Your payment was verified securely and your order is confirmed."
+      : (state.backendOnline
+        ? "Your order has been saved by FoodieHub. Keep this number handy for updates."
+        : "This demo order is saved in this browser only. Connect the backend to save orders centrally.");
+    $("#successMessage").textContent = (order.message || defaultMessage) + (pointsEarned ? " You earned " + pointsEarned + " Foodie Points!" : "");
+    openDialog("successDialog");
+  }
+
+  function loadRazorpayCheckout() {
+    if (window.Razorpay) return Promise.resolve();
+    return new Promise((resolve, reject) => {
+      const existing = document.querySelector("script[data-razorpay-checkout]");
+      if (existing) {
+        existing.addEventListener("load", resolve, { once: true });
+        existing.addEventListener("error", () => reject(new Error("The secure payment window could not be loaded. Please try again.")), { once: true });
+        return;
+      }
+      const script = document.createElement("script");
+      script.src = "https://checkout.razorpay.com/v1/checkout.js";
+      script.async = true;
+      script.dataset.razorpayCheckout = "true";
+      script.onload = resolve;
+      script.onerror = () => reject(new Error("The secure payment window could not be loaded. Please try again."));
+      document.head.appendChild(script);
+    });
+  }
+
+  async function startOnlinePayment(payload, customer) {
+    if (!state.backendOnline || !state.paymentGateway.enabled) {
+      throw new Error("Online payments are not configured yet. Choose Cash on Delivery or UPI on Delivery.");
+    }
+    const order = await request("/api/payments/create-order", { method: "POST", body: JSON.stringify(payload) });
+    await loadRazorpayCheckout();
+    const checkout = new window.Razorpay({
+      key: order.keyId,
+      amount: order.amount,
+      currency: order.currency,
+      name: "FoodieHub",
+      description: "FoodieHub order " + order.orderNumber,
+      order_id: order.razorpayOrderId,
+      prefill: { name: customer.name, email: customer.email, contact: customer.phone },
+      notes: { foodHubOrderNumber: order.orderNumber },
+      theme: { color: document.documentElement.dataset.theme === "dark" ? "#467d58" : "#2c6547" },
+      handler: async response => {
+        try {
+          const verified = await request("/api/payments/verify", {
+            method: "POST",
+            body: JSON.stringify({
+              razorpay_order_id: response.razorpay_order_id,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_signature: response.razorpay_signature
+            })
+          });
+          finalizeOrder(verified, customer, payload, "online");
+        } catch (error) {
+          $("#checkoutError").textContent = error.message || "We could not verify this payment. Your bag has been kept. Please contact support before retrying.";
+          showToast("Payment verification needs attention. Your bag has been kept.", "error");
+        }
+      },
+      modal: {
+        ondismiss: () => {
+          $("#checkoutError").textContent = "Payment was not completed. Your bag is still saved, so you can try again.";
+        }
+      }
+    });
+    checkout.on("payment.failed", response => {
+      const description = response && response.error && response.error.description;
+      $("#checkoutError").textContent = description || "Payment failed. Your bag is still saved; please try again.";
+    });
+    checkout.open();
   }
 
   async function placeOrder(event) {
@@ -592,20 +718,37 @@
       email: String(form.get("email") || "").trim(),
       address: String(form.get("address") || "").trim()
     };
+    if (customer.name.length < 2) {
+      $("#checkoutError").textContent = "Please enter your name.";
+      return;
+    }
     if (customer.phone.length !== 10 || !/^[6-9]/.test(customer.phone)) {
       $("#checkoutError").textContent = "Please enter a valid 10-digit Indian mobile number.";
       return;
     }
+    if (customer.address.length < 12) {
+      $("#checkoutError").textContent = "Please enter your complete delivery address.";
+      return;
+    }
+    const paymentMethod = String(form.get("paymentMethod") || "cod");
     const payload = {
       customer,
       items: getCartLines().map(item => ({ productId: item.id, quantity: item.quantity, customizations: item.customization || {} })),
       couponCode: state.coupon ? state.coupon.code : "",
-      paymentMethod: String(form.get("paymentMethod") || "cod")
+      paymentMethod
     };
+    if (!payload.items.length) {
+      $("#checkoutError").textContent = "Your bag is empty. Add a dish before placing the order.";
+      return;
+    }
     const submit = $(".place-order-button");
     submit.disabled = true;
-    submit.textContent = "Placing your order…";
+    submit.textContent = paymentMethod === "razorpay" ? "Opening secure payment…" : "Placing your order…";
     try {
+      if (paymentMethod === "razorpay") {
+        await startOnlinePayment(payload, customer);
+        return;
+      }
       let order;
       if (state.backendOnline) {
         order = await request("/api/orders", { method: "POST", body: JSON.stringify(payload) });
@@ -618,31 +761,9 @@
           createdAt: new Date().toISOString(),
           message: "Demo order saved on this device only."
         };
-        saveLocalOrder({ ...order, phone: customer.phone, items: payload.items, customer });
+        saveLocalOrder({ ...order, phone: customer.phone, items: payload.items, customer, paymentMethod });
       }
-      const appliedCouponCode = state.coupon ? state.coupon.code : "";
-      if (appliedCouponCode === "REWARD25" && state.pendingRewardRedemption) state.rewards.points = Math.max(0, Number(state.rewards.points || 0) - 50);
-      const pointsEarned = Math.max(0, Math.floor(Number(order.total || calculateBill().total) / 10));
-      state.rewards.points = Number(state.rewards.points || 0) + pointsEarned;
-      state.rewards.lifetime = Number(state.rewards.lifetime || 0) + pointsEarned;
-      saveStore(STORAGE.rewards, state.rewards);
-      state.pendingRewardRedemption = false;
-      renderRewards();
-      if ($("#saveCheckoutProfile").checked) {
-        state.profile = customer;
-        saveStore(STORAGE.profile, state.profile);
-        renderProfile();
-      }
-      state.cart = {};
-      state.coupon = null;
-      saveStore(STORAGE.cart, state.cart);
-      renderCart();
-      closeDialog("checkoutDialog");
-      $("#successOrderNumber").textContent = order.orderNumber;
-      $("#successMessage").textContent = (state.backendOnline
-        ? "Your order has been saved. Keep this number handy for updates."
-        : "This demo order is saved in this browser only. Connect the backend to save orders centrally.") + (pointsEarned ? " You earned " + pointsEarned + " Foodie Points!" : "");
-      openDialog("successDialog");
+      finalizeOrder(order, customer, payload, "delivery");
     } catch (error) {
       $("#checkoutError").textContent = error.message || "We couldn't place that order. Please try again.";
     } finally {
@@ -873,10 +994,26 @@
     $("#profileForm").addEventListener("submit", saveProfile);
     $("#closeCart").addEventListener("click", closeCart);
     $("#cartBackdrop").addEventListener("click", closeCart);
-    $("#checkoutButton").addEventListener("click", openCheckout);
+    $("#cartDrawer").addEventListener("click", event => {
+      const checkoutButton = event.target.closest("#checkoutButton");
+      if (!checkoutButton) return;
+      event.preventDefault();
+      if (checkoutButton.disabled) {
+        showToast("Add at least one dish to your bag before checkout.", "error");
+        return;
+      }
+      openCheckout();
+    });
     $("#applyCoupon").addEventListener("click", applyCoupon);
     $("#couponInput").addEventListener("keydown", event => { if (event.key === "Enter") { event.preventDefault(); applyCoupon(); } });
     $("#checkoutForm").addEventListener("submit", placeOrder);
+    $("#checkoutForm").addEventListener("change", event => {
+      if (event.target && event.target.name === "paymentMethod") {
+        $(".place-order-button").textContent = event.target.value === "razorpay"
+          ? "Continue to secure payment →"
+          : "Place my order →";
+      }
+    });
     $("#trackingForm").addEventListener("submit", trackOrder);
     $("#trackOrderLink").addEventListener("click", openTracking);
     bindFeatureEvents();

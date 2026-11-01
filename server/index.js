@@ -26,6 +26,11 @@ db.exec([
   ");",
   "CREATE TABLE IF NOT EXISTS subscribers (email TEXT PRIMARY KEY, created_at TEXT NOT NULL);"
 ].join(" "));
+const existingOrderColumns = new Set(db.pragma("table_info(orders)").map(column => column.name));
+if (!existingOrderColumns.has("gateway_order_id")) {
+  db.exec("ALTER TABLE orders ADD COLUMN gateway_order_id TEXT");
+}
+db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_gateway_order_id ON orders(gateway_order_id) WHERE gateway_order_id IS NOT NULL");
 
 const MENU_PATH = path.join(ROOT, "data", "menu.json");
 const menu = JSON.parse(fs.readFileSync(MENU_PATH, "utf8"));
@@ -37,7 +42,8 @@ app.use(helmet({
   contentSecurityPolicy: {
     directives: {
       defaultSrc: ["'self'"],
-      scriptSrc: ["'self'"],
+      scriptSrc: ["'self'", "https://checkout.razorpay.com"],
+      frameSrc: ["'self'", "https://api.razorpay.com", "https://checkout.razorpay.com"],
       styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
       fontSrc: ["'self'", "https://fonts.gstatic.com", "data:"],
       imgSrc: ["'self'", "data:", "https://images.unsplash.com"],
@@ -86,6 +92,70 @@ function calculateCoupon(code, subtotal) {
   const discount = offer.fixed ? Math.min(offer.fixed, subtotal) : Math.min(round(subtotal * offer.percent / 100), offer.max);
   return { code: normalized, discount };
 }
+function calculateCustomization(product, input) {
+  const data = input && typeof input === "object" ? input : {};
+  const category = String(product.category || "").toLowerCase();
+  const largePrice = category === "drinks" ? 30 : category === "desserts" ? 35 : category === "sides" ? 29 : 49;
+  const largeName = category === "desserts" ? "Double treat" : "Large";
+  const sizeOptions = { Regular: 0, [largeName]: largePrice };
+  const requestedSize = String(data.size || "Regular");
+  if (!Object.prototype.hasOwnProperty.call(sizeOptions, requestedSize)) {
+    const error = new Error("One of the selected serving sizes is not available.");
+    error.status = 400;
+    throw error;
+  }
+
+  let allowedExtras;
+  if (["burgers", "pizza", "sides"].includes(category)) {
+    allowedExtras = [
+      { name: "Extra cheese", price: 29 },
+      { name: product.isVeg ? "Extra paneer patty" : "Extra chicken patty", price: product.isVeg ? 49 : 69 },
+      { name: "Fries combo", price: 69 },
+      { name: "Signature dip", price: 20 }
+    ];
+  } else if (["pasta", "bowls", "indian"].includes(category)) {
+    allowedExtras = [
+      { name: "Extra cheese", price: 29 },
+      { name: product.isVeg ? "Extra paneer" : "Extra chicken", price: product.isVeg ? 49 : 59 },
+      { name: "Extra sauce / gravy", price: 25 },
+      { name: "Garlic bread", price: 49 }
+    ];
+  } else if (category === "desserts") {
+    allowedExtras = [{ name: "Ice cream scoop", price: 39 }, { name: "Whipped cream", price: 19 }, { name: "Chocolate drizzle", price: 20 }];
+  } else if (category === "drinks") {
+    allowedExtras = [{ name: "Extra espresso shot", price: 35 }, { name: "Whipped cream", price: 19 }, { name: "Vanilla scoop", price: 29 }];
+  } else {
+    allowedExtras = [{ name: "Signature dip", price: 20 }, { name: "Extra cheese", price: 25 }, { name: "Make it loaded", price: 35 }];
+  }
+
+  const requestedExtras = Array.isArray(data.extras) ? data.extras : [];
+  if (requestedExtras.length > 8) {
+    const error = new Error("Too many add-ons were selected.");
+    error.status = 400;
+    throw error;
+  }
+  const extras = requestedExtras.map(extra => {
+    const allowed = allowedExtras.find(option => option.name === String(extra && extra.name || ""));
+    if (!allowed) {
+      const error = new Error("One of the selected add-ons is not available for this dish.");
+      error.status = 400;
+      throw error;
+    }
+    return { name: allowed.name, price: allowed.price };
+  });
+  const preferences = Array.isArray(data.preferences) ? data.preferences.map(String).slice(0, 8) : [];
+  const note = String(data.note || "").trim().slice(0, 180);
+  const sizeExtra = sizeOptions[requestedSize];
+  return {
+    size: requestedSize,
+    sizeExtra,
+    extras,
+    preferences,
+    note,
+    unitPrice: round(product.price + sizeExtra + extras.reduce((sum, extra) => sum + extra.price, 0))
+  };
+}
+
 function calculateOrder(items, couponCode) {
   if (!Array.isArray(items) || items.length < 1 || items.length > 30) {
     const error = new Error("Add at least one menu item before placing an order.");
@@ -103,13 +173,21 @@ function calculateOrder(items, couponCode) {
       error.status = 400;
       throw error;
     }
-    subtotal += product.price * quantity;
+    const customizations = calculateCustomization(product, requested.customizations);
+    subtotal += customizations.unitPrice * quantity;
     verifiedItems.push({
       productId: product.id,
       name: product.name,
-      price: product.price,
+      price: customizations.unitPrice,
+      basePrice: product.price,
       quantity,
-      lineTotal: round(product.price * quantity)
+      lineTotal: round(customizations.unitPrice * quantity),
+      customizations: {
+        size: customizations.size,
+        extras: customizations.extras,
+        preferences: customizations.preferences,
+        note: customizations.note
+      }
     });
   }
   subtotal = round(subtotal);
@@ -174,14 +252,121 @@ app.get("/api/menu", (req, res) => {
   res.json({ count: items.length, items });
 });
 
+
+function validateCustomer(customer) {
+  const source = customer || {};
+  const name = String(source.name || "").trim();
+  const phone = cleanPhone(source.phone);
+  const email = String(source.email || "").trim().toLowerCase();
+  const address = String(source.address || "").trim();
+  if (name.length < 2 || name.length > 80) { const error = new Error("Please enter a valid name."); error.status = 400; throw error; }
+  if (!/^[6-9]\d{9}$/.test(phone)) { const error = new Error("Please enter a valid 10-digit mobile number."); error.status = 400; throw error; }
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { const error = new Error("Please enter a valid email address."); error.status = 400; throw error; }
+  if (address.length < 12 || address.length > 500) { const error = new Error("Please enter a complete delivery address."); error.status = 400; throw error; }
+  return { name, phone, email, address };
+}
+function razorpayEnabled() {
+  return Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
+}
+async function razorpayRequest(endpoint, options = {}) {
+  if (!razorpayEnabled()) { const error = new Error("Online payments are not configured on the FoodieHub backend."); error.status = 503; throw error; }
+  const authorization = Buffer.from(process.env.RAZORPAY_KEY_ID + ":" + process.env.RAZORPAY_KEY_SECRET).toString("base64");
+  const response = await fetch("https://api.razorpay.com/v1" + endpoint, {
+    method: options.method || "GET",
+    headers: { Authorization: "Basic " + authorization, "Content-Type": "application/json" },
+    ...(options.body ? { body: JSON.stringify(options.body) } : {})
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const error = new Error(payload.error && payload.error.description || "The payment provider could not complete the request.");
+    error.status = response.status >= 500 ? 502 : 400;
+    throw error;
+  }
+  return payload;
+}
+
+app.get("/api/payments/config", (req, res) => {
+  res.json({ enabled: razorpayEnabled(), keyId: razorpayEnabled() ? process.env.RAZORPAY_KEY_ID : "" });
+});
+
+app.post("/api/payments/create-order", async (req, res, next) => {
+  try {
+    if (!razorpayEnabled()) return res.status(503).json({ error: "Online payment is not enabled yet. Choose a delivery payment option." });
+    const body = req.body || {};
+    const customer = validateCustomer(body.customer);
+    const bill = calculateOrder(body.items, body.couponCode);
+    const orderNumber = createOrderNumber();
+    const createdAt = new Date().toISOString();
+    const gatewayOrder = await razorpayRequest("/orders", {
+      method: "POST",
+      body: { amount: Math.round(bill.total * 100), currency: "INR", receipt: orderNumber, notes: { foodiehub_order_number: orderNumber } }
+    });
+    if (!gatewayOrder.id || Number(gatewayOrder.amount) !== Math.round(bill.total * 100)) {
+      const error = new Error("The payment provider returned an invalid order. Please try again.");
+      error.status = 502;
+      throw error;
+    }
+    db.prepare([
+      "INSERT INTO orders (order_number, customer_name, phone, email, address, items_json, subtotal, coupon_code, coupon_discount, delivery_fee, tax, total, payment_method, payment_status, status, created_at, gateway_order_id)",
+      "VALUES (@orderNumber, @name, @phone, @email, @address, @itemsJson, @subtotal, @couponCode, @couponDiscount, @deliveryFee, @tax, @total, 'razorpay', 'created', 'payment_pending', @createdAt, @gatewayOrderId)"
+    ].join(" ")).run({
+      orderNumber, ...customer, itemsJson: JSON.stringify(bill.items), subtotal: bill.subtotal,
+      couponCode: bill.couponCode, couponDiscount: bill.couponDiscount, deliveryFee: bill.deliveryFee,
+      tax: bill.tax, total: bill.total, createdAt, gatewayOrderId: gatewayOrder.id
+    });
+    return res.status(201).json({
+      keyId: process.env.RAZORPAY_KEY_ID, razorpayOrderId: gatewayOrder.id,
+      orderNumber, amount: gatewayOrder.amount, currency: gatewayOrder.currency || "INR", total: bill.total
+    });
+  } catch (error) { return next(error); }
+});
+
+app.post("/api/payments/verify", async (req, res, next) => {
+  try {
+    if (!razorpayEnabled()) return res.status(503).json({ error: "Online payment verification is not configured." });
+    const body = req.body || {};
+    const orderId = String(body.razorpay_order_id || "").trim();
+    const paymentId = String(body.razorpay_payment_id || "").trim();
+    const signature = String(body.razorpay_signature || "").trim();
+    if (!orderId || !paymentId || !/^[a-f0-9]{64}$/i.test(signature)) return res.status(400).json({ error: "The payment confirmation details are incomplete." });
+    const row = db.prepare("SELECT order_number, gateway_order_id, total, payment_status FROM orders WHERE gateway_order_id = ?").get(orderId);
+    if (!row) return res.status(404).json({ error: "The FoodieHub order for this payment could not be found." });
+    if (row.payment_status === "paid") return res.json({
+      orderNumber: row.order_number, status: "confirmed", total: row.total, paymentStatus: "paid",
+      paymentMethod: "razorpay", message: "This payment was already verified."
+    });
+    const expected = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
+      .update(row.gateway_order_id + "|" + paymentId).digest("hex");
+    const expectedBuffer = Buffer.from(expected, "hex");
+    const receivedBuffer = Buffer.from(signature, "hex");
+    if (expectedBuffer.length !== receivedBuffer.length || !crypto.timingSafeEqual(expectedBuffer, receivedBuffer)) {
+      return res.status(400).json({ error: "Payment signature verification failed. The order has not been confirmed." });
+    }
+    let payment = await razorpayRequest("/payments/" + encodeURIComponent(paymentId));
+    if (payment.order_id !== row.gateway_order_id || Number(payment.amount) !== Math.round(Number(row.total) * 100)) {
+      return res.status(400).json({ error: "The payment amount or order does not match this FoodieHub order." });
+    }
+    if (payment.status === "authorized" && !payment.captured) {
+      payment = await razorpayRequest("/payments/" + encodeURIComponent(paymentId) + "/capture", {
+        method: "POST", body: { amount: Math.round(Number(row.total) * 100), currency: "INR" }
+      });
+    }
+    if (payment.status !== "captured" && payment.captured !== true) {
+      return res.status(409).json({ error: "Payment is authorised but not captured yet. The order is still pending; contact support before retrying." });
+    }
+    db.prepare("UPDATE orders SET payment_status = 'paid', status = 'confirmed' WHERE order_number = ?").run(row.order_number);
+    return res.json({
+      orderNumber: row.order_number, status: "confirmed", total: row.total, paymentStatus: "paid",
+      paymentMethod: "razorpay", message: "Payment captured and verified securely. Your order is confirmed."
+    });
+  } catch (error) { return next(error); }
+});
+
 app.post("/api/orders", (req, res, next) => {
   try {
     const body = req.body || {};
-    const customer = body.customer || {};
-    const name = String(customer.name || "").trim();
-    const phone = cleanPhone(customer.phone);
-    const email = String(customer.email || "").trim().toLowerCase();
-    const address = String(customer.address || "").trim();
+    const customer = validateCustomer(body.customer);
+    const { name, phone, email, address } = customer;
     const paymentMethod = String(body.paymentMethod || "cod");
     if (name.length < 2 || name.length > 80) return res.status(400).json({ error: "Please enter a valid name." });
     if (!/^[6-9]\d{9}$/.test(phone)) return res.status(400).json({ error: "Please enter a valid 10-digit mobile number." });

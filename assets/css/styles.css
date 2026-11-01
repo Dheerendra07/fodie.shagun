@@ -1650,3 +1650,178 @@ h1 em,h2 em {
 .admin-table-heading h3{font-size:16px}.tracking-result{padding-inline:20px}
 }
 @media(max-width:390px){.meal-builder-controls{grid-template-columns:1fr}.meal-veg-toggle{grid-column:auto}.combo-card-footer{align-items:flex-start;flex-direction:column}.rewards-progress-label{flex-direction:column;gap:4px}.admin-stats article strong{font-size:16px}}
+
+
+/* Checkout reliability: keep the order summary and checkout action within reach. */
+.cart-drawer { height: 100dvh; min-height: 0; }
+.drawer-header { flex: 0 0 auto; }
+.cart-items { flex: 1 1 auto; min-height: 0; overscroll-behavior: contain; }
+.drawer-bottom {
+  position: relative;
+  z-index: 2;
+  flex: 0 0 auto;
+  max-height: min(66dvh, 590px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid var(--glass-border);
+  background: var(--glass-strong);
+  -webkit-backdrop-filter: blur(30px) saturate(155%);
+  backdrop-filter: blur(30px) saturate(155%);
+}
+.checkout-button {
+  position: sticky;
+  z-index: 3;
+  bottom: 0;
+  min-height: 50px;
+  border: 1px solid var(--glass-border);
+  box-shadow: 0 -8px 22px rgba(25,35,27,.08), 0 10px 28px rgba(29,77,53,.18);
+  pointer-events: auto;
+  touch-action: manipulation;
+}
+.checkout-button:disabled { pointer-events: none; }
+.site-dialog[open] { z-index: 1000; }
+.site-dialog.dialog-fallback-open {
+  position: fixed;
+  inset: 50% auto auto 50%;
+  transform: translate(-50%,-50%);
+  z-index: 1001;
+}
+.site-dialog.dialog-fallback-open::backdrop { background: rgba(8,16,11,.58); }
+
+/* Liquid-glass controls with explicit native option contrast in both themes. */
+.feature-field select,
+.recommendation-filter select,
+.admin-table select,
+.sort-control select,
+.form-field input,
+.form-field textarea,
+.coupon-row input {
+  border: 1px solid var(--glass-border);
+  background: var(--glass-strong);
+  color: var(--ink);
+  box-shadow: inset 0 1px 0 var(--glass-highlight), 0 7px 20px rgba(25,35,27,.045);
+  -webkit-backdrop-filter: blur(18px) saturate(145%);
+  backdrop-filter: blur(18px) saturate(145%);
+}
+.feature-field select,
+.recommendation-filter select,
+.admin-table select,
+.sort-control select {
+  min-height: 46px;
+  border-radius: 13px;
+  padding-inline: 13px 38px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.feature-field select:focus-visible,
+.recommendation-filter select:focus-visible,
+.admin-table select:focus-visible,
+.sort-control select:focus-visible {
+  outline: 2px solid var(--orange);
+  outline-offset: 2px;
+  border-color: var(--orange);
+}
+:root:not([data-theme="dark"]) select,
+:root:not([data-theme="dark"]) select option { color-scheme: light; }
+:root:not([data-theme="dark"]) select option {
+  background: #fffdf8;
+  color: #28231d;
+}
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] select option { color-scheme: dark; }
+:root[data-theme="dark"] select,
+:root[data-theme="dark"] select option { color: #f3eee5; }
+:root[data-theme="dark"] select option {
+  background: #1d2821;
+  color: #f3eee5;
+}
+:root[data-theme="dark"] .feature-field select,
+:root[data-theme="dark"] .recommendation-filter select,
+:root[data-theme="dark"] .admin-table select,
+:root[data-theme="dark"] .sort-control select,
+:root[data-theme="dark"] .form-field input,
+:root[data-theme="dark"] .form-field textarea,
+:root[data-theme="dark"] .coupon-row input {
+  border-color: rgba(255,255,255,.17);
+  background-color: rgba(255,255,255,.075);
+  color: #f3eee5;
+}
+:root[data-theme="dark"] .recommendation-filter select option,
+:root[data-theme="dark"] .feature-field select option,
+:root[data-theme="dark"] .admin-table select option {
+  background-color: #1d2821;
+  color: #f3eee5;
+}
+:root:not([data-theme="dark"]) .feature-field select,
+:root:not([data-theme="dark"]) .recommendation-filter select,
+:root:not([data-theme="dark"]) .admin-table select {
+  border-color: rgba(91,112,84,.22);
+  background-color: rgba(255,253,248,.78);
+  color: #28231d;
+}
+.recommendation-filter select {
+  min-height: 50px;
+  border-radius: 15px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.recommendation-filter { color: var(--ink); }
+.meal-builder-summary,
+.combo-card,
+.recommendation-card,
+.rewards-score,
+.payment-choice label {
+  border-color: var(--glass-border);
+  background: var(--glass);
+  box-shadow: var(--glass-shadow);
+  -webkit-backdrop-filter: blur(22px) saturate(145%);
+  backdrop-filter: blur(22px) saturate(145%);
+}
+.combo-card:hover,
+.recommendation-card:hover,
+.meal-builder-summary:hover {
+  border-color: color-mix(in srgb,var(--orange) 40%,var(--glass-border));
+  box-shadow: var(--glass-shadow),0 12px 28px rgba(0,0,0,.07);
+}
+:root[data-theme="dark"] .feature-heading h2,
+:root[data-theme="dark"] .feature-field span,
+:root[data-theme="dark"] .recommendation-card-copy h3,
+:root[data-theme="dark"] .recommendation-card-copy > div > strong,
+:root[data-theme="dark"] .combo-card-body h3,
+:root[data-theme="dark"] .rewards-score > strong,
+:root[data-theme="dark"] .admin-stats article strong { color: #f3eee5; }
+:root[data-theme="dark"] .feature-heading p,
+:root[data-theme="dark"] .recommendation-card-copy p,
+:root[data-theme="dark"] .recommendation-note,
+:root[data-theme="dark"] .combo-card-body > p,
+:root[data-theme="dark"] .combo-card-body li,
+:root[data-theme="dark"] .meal-summary-items,
+:root[data-theme="dark"] .meal-builder-summary > small { color: #c1c9bf; }
+.payment-choice label { transition: border-color .2s, background .2s, box-shadow .2s; }
+.payment-choice label:has(input:checked) {
+  border-color: var(--orange);
+  background: color-mix(in srgb,var(--orange) 12%,var(--glass-strong));
+  box-shadow: inset 0 1px 0 var(--glass-highlight),0 0 0 2px var(--focus-ring);
+}
+.online-payment-choice[hidden] { display: none !important; }
+.payment-availability-note {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border: 1px solid var(--glass-border);
+  border-radius: 12px;
+  background: var(--glass);
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.55;
+  box-shadow: inset 0 1px 0 var(--glass-highlight);
+}
+:root[data-theme="dark"] .payment-availability-note { color: #c1c9bf; }
+@media (max-height: 720px) {
+  .drawer-bottom { max-height: 64dvh; padding-bottom: max(12px,env(safe-area-inset-bottom)); }
+  .drawer-header { padding-top: 16px; padding-bottom: 14px; }
+}
+@media (max-width: 760px) {
+  .drawer-bottom { max-height: 70dvh; padding: 13px 16px max(14px,env(safe-area-inset-bottom)); }
+  .checkout-button { min-height: 48px; }
+  .recommendation-filter select { min-height: 48px; }
+}
