@@ -547,7 +547,7 @@
     if (!coupons[code]) {
       state.pendingRewardRedemption = false;
       state.coupon = null;
-      $("#couponMessage").textContent = "That code doesn't look right. Try HUB50 or FOOD25.";
+      $("#couponMessage").textContent = "That code doesn't look right. Try HUB50, FOOD25 or COMBO10, or redeem points in Rewards.";
       $("#couponMessage").className = "coupon-message message-warning";
     } else if (calculateBill().subtotal < coupons[code].minimum) {
       state.pendingRewardRedemption = code === "REWARD25";
@@ -765,7 +765,7 @@
     const items=combo.ids.map(findMenuItem).filter(Boolean);if(items.length!==3)return;
     items.forEach(item=>{state.cart[item.id]=Math.min(20,(state.cart[item.id]||0)+1);});
     state.coupon={code:"COMBO10",percent:10,maximum:150,minimum:199};state.pendingRewardRedemption=false;
-    $("#couponInput").value="COMBO10";$("#couponMessage").textContent="COMBO10 added. Your eligible bag gets 10% off.";"";
+    $("#couponInput").value="COMBO10";$("#couponMessage").textContent="COMBO10 added. Your eligible bag gets 10% off.";
     $("#couponMessage").className="coupon-message message-success";saveStore(STORAGE.cart,state.cart);renderCart();showToast(combo.title+" added. COMBO10 is ready in your bag.");
   }
   function getRecommendedItems(mood){
