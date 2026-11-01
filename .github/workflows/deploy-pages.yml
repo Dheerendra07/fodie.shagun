@@ -28,6 +28,19 @@ jobs:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
+      - name: Validate JavaScript and menu data
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check source files
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check server/index.js
+          node --check assets/js/app.js
+          node -e "JSON.parse(require('fs').readFileSync('data/menu.json', 'utf8'))"
+
       - name: Prepare static website
         shell: bash
         run: |
