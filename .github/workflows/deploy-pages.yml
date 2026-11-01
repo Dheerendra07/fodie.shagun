@@ -20,7 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     environment:
       name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
+      url: \${{ steps.deployment.outputs.page_url }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v6
@@ -46,7 +46,6 @@ jobs:
           html = page.read_text(encoding="utf-8")
           link = '<link rel="stylesheet" href="foodiehub-ui-refinement.css?v=2">'
 
-          # Check for the actual stylesheet link, not merely the filename anywhere in the app.
           linked = re.search(
               r'<link\b[^>]*href=["\'](?:\./)?foodiehub-ui-refinement\.css(?:\?[^"\']*)?["\']',
               html,
