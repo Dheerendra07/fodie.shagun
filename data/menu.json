@@ -36,7 +36,7 @@
       "cheese",
       "burger"
     ],
-    "image": "https://images.unsplash.com/photo-1553979459-d2229ba7433a?auto=format&fit=crop&w=900&q=85"
+    "image": "https://images.unsplash.com/photo-1767065703793-7012f5fced19?auto=format&fit=crop&w=1100&q=88"
   },
   {
     "id": "peri-peri-paneer-burger",
@@ -74,7 +74,7 @@
       "cheese",
       "basil"
     ],
-    "image": "https://images.unsplash.com/photo-1571407970349-bc81e7e96d47?auto=format&fit=crop&w=900&q=85"
+    "image": "https://images.unsplash.com/photo-1658478006307-525ab032ab26?auto=format&fit=crop&w=1100&q=88"
   },
   {
     "id": "fire-roasted-paneer-pizza",
@@ -131,7 +131,7 @@
       "cream",
       "tomato"
     ],
-    "image": "https://images.unsplash.com/photo-1473093295043-cdd812d0e601?auto=format&fit=crop&w=900&q=85"
+    "image": "https://images.unsplash.com/photo-1608219992759-8d74ed8d76eb?auto=format&fit=crop&w=1100&q=88"
   },
   {
     "id": "basil-pesto-pasta",
@@ -150,7 +150,7 @@
       "basil",
       "pesto"
     ],
-    "image": "https://images.unsplash.com/photo-1551183053-bf91a1d81141?auto=format&fit=crop&w=900&q=85"
+    "image": "https://images.unsplash.com/photo-1546549032-9571cd6b27df?auto=format&fit=crop&w=1100&q=88"
   },
   {
     "id": "chicken-alfredo-pasta",
@@ -188,7 +188,7 @@
       "paneer",
       "indian"
     ],
-    "image": "https://images.unsplash.com/photo-1546069901-ba9599a7e63c?auto=format&fit=crop&w=900&q=85"
+    "image": "https://images.unsplash.com/photo-1701579231320-cc2f7acad3cd?auto=format&fit=crop&w=1100&q=88"
   },
   {
     "id": "grilled-chicken-rice-bowl",
@@ -207,7 +207,7 @@
       "chicken",
       "healthy"
     ],
-    "image": "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?auto=format&fit=crop&w=900&q=85"
+    "image": "https://images.unsplash.com/photo-1631515243349-e0cb75fb8d3a?auto=format&fit=crop&w=1100&q=88"
   },
   {
     "id": "falafel-crunch-bowl",
@@ -226,7 +226,7 @@
       "hummus",
       "vegan"
     ],
-    "image": "https://images.unsplash.com/photo-1547592180-85f173990554?auto=format&fit=crop&w=900&q=85"
+    "image": "https://images.unsplash.com/photo-1680405531955-8b4981bb1b0c?auto=format&fit=crop&w=1100&q=88"
   },
   {
     "id": "butter-paneer-bowl",
@@ -266,7 +266,7 @@
       "indian",
       "rice"
     ],
-    "image": "https://images.unsplash.com/photo-1563379091339-03246963d96c?auto=format&fit=crop&w=900&q=85"
+    "image": "https://images.unsplash.com/photo-1641893728260-19493532d6b9?auto=format&fit=crop&w=1100&q=88"
   },
   {
     "id": "loaded-peri-peri-fries",
@@ -304,7 +304,7 @@
       "potato",
       "snack"
     ],
-    "image": "https://images.unsplash.com/photo-1630384060421-cb20d0e0649d?auto=format&fit=crop&w=900&q=85"
+    "image": "https://images.unsplash.com/photo-1688978181542-87a886a16fbe?auto=format&fit=crop&w=1100&q=88"
   },
   {
     "id": "crispy-chicken-popcorn",
@@ -342,7 +342,7 @@
       "chilli",
       "garlic"
     ],
-    "image": "https://images.unsplash.com/photo-1625220194771-7ebdea0b70b9?auto=format&fit=crop&w=900&q=85"
+    "image": "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=1100&q=88"
   },
   {
     "id": "dark-chocolate-lava-cake",
@@ -361,7 +361,7 @@
       "cake",
       "dessert"
     ],
-    "image": "https://images.unsplash.com/photo-1606313564200-e75d5e30476c?auto=format&fit=crop&w=900&q=85"
+    "image": "https://images.unsplash.com/photo-1617305855058-336d24456869?auto=format&fit=crop&w=1100&q=88"
   },
   {
     "id": "biscoff-cheesecake",
@@ -399,7 +399,7 @@
       "cheesecake",
       "dessert"
     ],
-    "image": "https://images.unsplash.com/photo-1563805042-7684c019e1cb?auto=format&fit=crop&w=900&q=85"
+    "image": "https://images.unsplash.com/photo-1524351199678-941a58a3df50?auto=format&fit=crop&w=1100&q=88"
   },
   {
     "id": "mango-milkshake",
@@ -418,7 +418,7 @@
       "milkshake",
       "drink"
     ],
-    "image": "https://images.unsplash.com/photo-1572490122747-3968b75cc699?auto=format&fit=crop&w=900&q=85"
+    "image": "https://images.pexels.com/photos/8211179/pexels-photo-8211179.jpeg?auto=compress&cs=tinysrgb&w=1200"
   },
   {
     "id": "iced-mocha",
@@ -456,6 +456,6 @@
       "mint",
       "drink"
     ],
-    "image": "https://images.unsplash.com/photo-1513558161293-cdaf765edfd7?auto=format&fit=crop&w=900&q=85"
+    "image": "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=1100&q=88"
   }
 ]

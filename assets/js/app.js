@@ -5,6 +5,34 @@
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
   const money = value => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(Math.round(Number(value) || 0));
   const API_BASE = (window.FOODIEHUB_API_URL || "").replace(/\/$/, "");
+
+  const PHOTO_FALLBACKS = {
+    Burgers:"https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1100&q=88",
+    Pizza:"https://images.unsplash.com/photo-1658478006307-525ab032ab26?auto=format&fit=crop&w=1100&q=88",
+    Pasta:"https://images.unsplash.com/photo-1608219992759-8d74ed8d76eb?auto=format&fit=crop&w=1100&q=88",
+    Bowls:"https://images.unsplash.com/photo-1680405531955-8b4981bb1b0c?auto=format&fit=crop&w=1100&q=88",
+    Indian:"https://images.unsplash.com/photo-1641893728260-19493532d6b9?auto=format&fit=crop&w=1100&q=88",
+    Sides:"https://images.unsplash.com/photo-1688978181542-87a886a16fbe?auto=format&fit=crop&w=1100&q=88",
+    Desserts:"https://images.unsplash.com/photo-1617305855058-336d24456869?auto=format&fit=crop&w=1100&q=88",
+    Drinks:"https://images.pexels.com/photos/8211179/pexels-photo-8211179.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    Featured:"https://images.unsplash.com/photo-1504674900247-0877df9cc836?auto=format&fit=crop&w=1200&q=88",
+    General:"https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1100&q=88"
+  };
+  function protectFoodPhoto(image,item){
+    const list=[PHOTO_FALLBACKS[item.category]||PHOTO_FALLBACKS.Featured,PHOTO_FALLBACKS.General];
+    let next=0;
+    image.onerror=()=>{
+      while(next<list.length){
+        const candidate=list[next++];
+        if(candidate===image.src)continue;
+        if(item.id)state.imageFallbacks[item.id]=candidate;
+        image.src=candidate;return;
+      }
+      image.onerror=null;image.removeAttribute("src");
+      image.alt=(item.name||"Food")+" photo is temporarily unavailable";
+      image.classList.add("photo-unavailable");
+    };
+  }
   const STORAGE = {
     cart: "foodiehub.cart.v2",
     favourites: "foodiehub.favourites.v2",
@@ -192,12 +220,9 @@
     items.forEach(item => {
       const card = template.content.firstElementChild.cloneNode(true);
       const image = $("[data-image]", card);
-      image.src = state.imageFallbacks[item.id] || item.image;
       image.alt = item.name + " — " + item.description;
-      image.addEventListener("error", () => {
-        if (!state.imageFallbacks[item.id]) state.imageFallbacks[item.id] = makeFoodSvg(item);
-        image.src = state.imageFallbacks[item.id];
-      }, { once: true });
+      protectFoodPhoto(image,item);
+      image.src = state.imageFallbacks[item.id] || item.image;
       image.addEventListener("click", () => openDishDetails(item.id));
       $("[data-name]", card).addEventListener("click", () => openDishDetails(item.id));
       $("[data-customize]", card).addEventListener("click", () => openDishDetails(item.id));
@@ -222,40 +247,6 @@
     });
   }
 
-
-  function makeFoodSvg(item) {
-    const category = String(item.category || "").toLowerCase();
-    const palettes = {
-      burgers: ["#f4c98d", "#c66b39", "#54372d", "#6f9b62"],
-      pizza: ["#f5cc8f", "#c65d3f", "#f2a64e", "#6c8b54"],
-      pasta: ["#ead0a2", "#b65b3f", "#e2a653", "#63845b"],
-      bowls: ["#e8d3ad", "#5e8462", "#d28a45", "#f0bd73"],
-      indian: ["#f0c98c", "#b84f32", "#dd9c42", "#6f8152"],
-      sides: ["#f1cc8c", "#bd703e", "#e0a74e", "#6d8b5d"],
-      desserts: ["#f2d4bc", "#9c4e47", "#d99466", "#f3c36f"],
-      drinks: ["#e6d3ab", "#638d78", "#d2a15a", "#b8d9ca"]
-    };
-    const palette = palettes[category] || palettes.bowls;
-    let food = "";
-    if (category === "burgers") {
-      food = '<path d="M180 207 C190 126 449 126 460 207Z" fill="#d9954d"/><path d="M180 207 Q320 184 460 207 L452 222 Q320 239 188 222Z" fill="#f6d08e"/><path d="M188 228 Q320 247 452 228 L442 245 Q320 261 198 245Z" fill="#5f884e"/><path d="M194 248 Q320 273 446 248 L437 264 Q320 287 203 264Z" fill="#a84430"/><path d="M198 267 Q320 286 442 267 L433 282 Q320 302 207 282Z" fill="#e7ac50"/><path d="M208 288 Q320 307 432 288 Q426 339 320 344 Q214 339 208 288Z" fill="#d88d43"/><g fill="#f7e5b8"><ellipse cx="250" cy="178" rx="4" ry="2"/><ellipse cx="309" cy="164" rx="4" ry="2"/><ellipse cx="374" cy="178" rx="4" ry="2"/></g>';
-    } else if (category === "pizza") {
-      food = '<circle cx="320" cy="236" r="135" fill="#bf6d3e"/><circle cx="320" cy="236" r="119" fill="#f1c575"/><circle cx="320" cy="236" r="103" fill="#d75e3e"/><path d="M320 133 L320 339 M217 236 H423 M248 164 L392 308 M392 164 L248 308" stroke="#f7dda5" stroke-width="5" opacity=".9"/><g fill="#9d4735" stroke="#f5d69d" stroke-width="4"><circle cx="284" cy="188" r="13"/><circle cx="358" cy="193" r="13"/><circle cx="266" cy="267" r="13"/><circle cx="347" cy="267" r="13"/><circle cx="319" cy="226" r="13"/></g><g fill="#5e8a54"><ellipse cx="309" cy="171" rx="8" ry="4" transform="rotate(-35 309 171)"/><ellipse cx="379" cy="248" rx="8" ry="4" transform="rotate(25 379 248)"/><ellipse cx="291" cy="302" rx="8" ry="4" transform="rotate(35 291 302)"/></g>';
-    } else if (category === "pasta") {
-      food = '<path d="M152 230 Q320 402 488 230 Q454 385 320 390 Q186 385 152 230Z" fill="#f2e4c9"/><ellipse cx="320" cy="231" rx="169" ry="102" fill="#fff5df"/><ellipse cx="320" cy="230" rx="139" ry="79" fill="#d9784b"/><g fill="none" stroke="#efc27e" stroke-width="12" stroke-linecap="round"><path d="M223 226 C260 143 390 155 380 230 C368 292 254 288 249 218 C248 173 332 158 356 211"/><path d="M238 251 C276 321 402 273 392 205 C384 157 280 151 275 210 C270 255 350 273 365 222"/><path d="M260 195 C297 143 371 176 355 226 C338 281 271 260 286 208"/></g><g fill="#6c8d54"><ellipse cx="288" cy="194" rx="11" ry="5" transform="rotate(-40 288 194)"/><ellipse cx="362" cy="247" rx="11" ry="5" transform="rotate(32 362 247)"/><ellipse cx="326" cy="179" rx="10" ry="5"/></g>';
-    } else if (category === "desserts") {
-      food = '<path d="M191 302 L403 302 L442 346 L221 346Z" fill="#bf8a62"/><path d="M202 291 L408 291 L408 306 L202 306Z" fill="#f4d6ae"/><path d="M202 190 Q300 165 408 190 L408 292 L202 292Z" fill="#e9b98e"/><path d="M202 190 Q300 168 408 190 L408 222 Q302 202 202 222Z" fill="#fff0d8"/><path d="M202 241 Q301 220 408 241 L408 259 Q302 240 202 259Z" fill="#9d514a"/><path d="M202 273 Q301 256 408 273 L408 292 L202 292Z" fill="#fff0d8"/><path d="M286 183 C260 149 299 136 315 165 C336 133 375 153 347 182Z" fill="#bd5144"/><path d="M317 165 Q332 136 353 143" fill="none" stroke="#62865a" stroke-width="7" stroke-linecap="round"/>';
-    } else if (category === "drinks") {
-      food = '<path d="M235 145 L405 145 L383 352 Q320 383 257 352Z" fill="#e8f1df" opacity=".83" stroke="#fff" stroke-width="7"/><path d="M249 204 L391 204 L377 340 Q320 365 263 340Z" fill="#d18a4b"/><path d="M269 247 Q319 219 376 249" fill="none" stroke="#f8dca6" stroke-width="11" stroke-linecap="round"/><path d="M352 143 L401 70" stroke="#f6f0df" stroke-width="13" stroke-linecap="round"/><g fill="#fff7dc" opacity=".75"><circle cx="297" cy="281" r="11"/><circle cx="345" cy="310" r="8"/><circle cx="321" cy="241" r="7"/></g><path d="M265 207 Q320 218 389 207" fill="none" stroke="#fff" stroke-width="5"/>';
-    } else if (category === "sides") {
-      food = '<path d="M205 190 L435 190 L408 358 Q320 383 232 358Z" fill="#c85b3d"/><path d="M205 190 L435 190 L428 221 L212 221Z" fill="#f2b75e"/><g stroke="#f5d08c" stroke-width="27" stroke-linecap="round"><path d="M250 211 L230 119"/><path d="M293 210 L285 102"/><path d="M335 210 L345 103"/><path d="M376 212 L396 125"/></g><g stroke="#fff0c9" stroke-width="4" opacity=".8"><path d="M231 158 L250 151"/><path d="M283 149 L298 148"/><path d="M341 150 L354 153"/></g>';
-    } else {
-      food = '<path d="M165 230 Q320 405 475 230 Q451 371 320 382 Q189 371 165 230Z" fill="#d7d0bd"/><ellipse cx="320" cy="229" rx="157" ry="94" fill="#f9f1df"/><ellipse cx="320" cy="227" rx="128" ry="70" fill="' + (category === "indian" ? "#bd603d" : "#d2a45e") + '"/><g fill="#f4e5bb"><ellipse cx="266" cy="208" rx="14" ry="5" transform="rotate(18 266 208)"/><ellipse cx="321" cy="190" rx="16" ry="5" transform="rotate(-15 321 190)"/><ellipse cx="365" cy="225" rx="15" ry="5" transform="rotate(20 365 225)"/><ellipse cx="290" cy="251" rx="15" ry="5" transform="rotate(-12 290 251)"/></g><g fill="#65885b"><circle cx="291" cy="190" r="8"/><circle cx="351" cy="255" r="9"/><circle cx="380" cy="200" r="6"/></g>';
-    }
-    const title = String(item.name || "FoodieHub special").replace(/[<>&]/g, "");
-    const svg = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 480" role="img" aria-label="' + title + ' illustration"><defs><linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop stop-color="' + palette[0] + '"/><stop offset="1" stop-color="' + palette[3] + '"/></linearGradient><radialGradient id="glow"><stop stop-color="#fff" stop-opacity=".65"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient><filter id="shadow" x="-30%" y="-30%" width="160%" height="170%"><feGaussianBlur stdDeviation="13"/></filter></defs><rect width="640" height="480" rx="34" fill="url(#bg)"/><circle cx="510" cy="82" r="150" fill="url(#glow)" opacity=".8"/><circle cx="100" cy="405" r="120" fill="#fff" opacity=".12"/><circle cx="320" cy="247" r="177" fill="#fff" opacity=".12"/><ellipse cx="320" cy="364" rx="170" ry="23" fill="#403329" opacity=".18" filter="url(#shadow)"/><ellipse cx="320" cy="345" rx="176" ry="43" fill="#fff" opacity=".42"/><ellipse cx="320" cy="336" rx="158" ry="35" fill="#fff" opacity=".72"/>' + food + '<g fill="' + palette[2] + '" opacity=".7"><circle cx="108" cy="112" r="7"/><circle cx="524" cy="336" r="9"/><circle cx="484" cy="135" r="5"/></g><g fill="#fff" opacity=".75"><path d="M130 270 l7 17 17 7 -17 7 -7 17 -7 -17 -17 -7 17 -7Z"/><path d="M504 220 l5 12 12 5 -12 5 -5 12 -5 -12 -12 -5 12 -5Z"/></g><text x="320" y="433" text-anchor="middle" fill="#fff" fill-opacity=".9" font-family="Arial,sans-serif" font-size="15" font-weight="700" letter-spacing="4">FOODIEHUB  •  ' + String(item.category || "SPECIAL").toUpperCase() + '</text></svg>';
-    return "data:image/svg+xml;charset=UTF-8," + encodeURIComponent(svg);
-  }
 
   function customizerAddons(item) {
     const category = String(item.category || "").toLowerCase();
@@ -314,9 +305,10 @@
     if (!item) return;
     state.currentCustomizer = id;
     state.customizerQuantity = 1;
-    $("#customizerImage").src = state.imageFallbacks[id] || item.image;
-    $("#customizerImage").alt = item.name + " — " + item.description;
-    $("#customizerImage").onerror = () => { $("#customizerImage").src = makeFoodSvg(item); };
+    const customizerImage=$("#customizerImage");
+    customizerImage.alt=item.name+" — "+item.description;
+    protectFoodPhoto(customizerImage,item);
+    customizerImage.src=state.imageFallbacks[id]||item.image;
     $("#customizerTitle").textContent = item.name;
     $("#customizerDescription").textContent = item.description;
     $("#customizerBasePrice").textContent = money(item.price);
@@ -347,7 +339,7 @@
     if (!item) return;
     const size = $('input[name="dishSize"]:checked');
     const sizeExtra = Number(size ? size.dataset.extra : 0);
-    const extras = $('input[name="dishAddon"]:checked').reduce((sum,input) => sum + Number(input.dataset.price || 0), 0);
+    const extras = $$('input[name="dishAddon"]:checked').reduce((sum,input) => sum + Number(input.dataset.price || 0), 0);
     const unit = item.price + sizeExtra + extras;
     $("#customizerUnitPrice").textContent = money(unit);
     $("#customizerTotal").textContent = money(unit * state.customizerQuantity);
@@ -360,8 +352,8 @@
     const item = state.menu.find(product => product.id === id);
     if (!item) return;
     const size = $('input[name="dishSize"]:checked');
-    const extras = $('input[name="dishAddon"]:checked').map(input => ({ name: input.value, price: Number(input.dataset.price || 0) }));
-    const preferences = $('input[name="dishPreference"]:checked').map(input => input.value);
+    const extras = $$('input[name="dishAddon"]:checked').map(input => ({ name: input.value, price: Number(input.dataset.price || 0) }));
+    const preferences = $$('input[name="dishPreference"]:checked').map(input => input.value);
     state.customizations[id] = {
       size: size ? size.value : "Regular",
       sizeExtra: Number(size ? size.dataset.extra : 0),
@@ -373,7 +365,7 @@
     saveStore(STORAGE.cart, state.cart);
     saveStore("foodiehub.customizations.v1", state.customizations);
     renderCart();
-    const card = $('#menuGrid [data-name]') ? $('#menuGrid .dish-card').find(element => $('[data-name]',element)?.textContent === item.name) : null;
+    const card = $$("#menuGrid .dish-card").find(element => $("[data-name]",element)?.textContent === item.name) || null;
     const addButton = card ? $('[data-add]', card) : null;
     animateAddToCart(addButton);
     closeDialog("dishDetailDialog");
@@ -508,13 +500,10 @@
       $("[data-quantity]", container).forEach(button => {
         button.addEventListener("click", () => changeQuantity(button.dataset.quantity, Number(button.dataset.change)));
       });
-      $(".cart-line img[data-food-id]", container).forEach(image => image.addEventListener("error", () => {
-        const dish = state.menu.find(product => product.id === image.dataset.foodId);
-        if (dish) {
-          state.imageFallbacks[dish.id] = makeFoodSvg(dish);
-          image.src = state.imageFallbacks[dish.id];
-        }
-      }, { once: true }));
+      $(".cart-line img[data-food-id]",container).forEach(image=>{
+        const dish=state.menu.find(product=>product.id===image.dataset.foodId);
+        if(dish)protectFoodPhoto(image,dish);
+      });
     }
     if (state.coupon && bill.subtotal < state.coupon.minimum) {
       $("#couponMessage").textContent = "Add " + money(state.coupon.minimum - bill.subtotal) + " more to use " + state.coupon.code + ".";
@@ -770,10 +759,10 @@
     bindEvents();
     renderProfile();
     renderCart();
-    const heroImage = $(".hero-image-frame img");
-    if (heroImage) heroImage.addEventListener("error", () => { heroImage.src = makeFoodSvg({ name: "FoodieHub chef's table", category: "Bowls" }); }, { once: true });
-    const storyImage = $(".story-image img");
-    if (storyImage) storyImage.addEventListener("error", () => { storyImage.src = makeFoodSvg({ name: "Fresh from the kitchen", category: "Indian" }); }, { once: true });
+    const heroImage=$(".hero-image-frame img");
+    if(heroImage)protectFoodPhoto(heroImage,{name:"FoodieHub chef's table",category:"Featured"});
+    const storyImage=$(".story-image img");
+    if(storyImage)protectFoodPhoto(storyImage,{name:"Fresh from the kitchen",category:"Indian"});
     try {
       await Promise.all([checkBackend()]);
       state.menu = await loadMenu();
