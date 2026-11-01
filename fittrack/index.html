@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#101510">
+  <title>FitTrack | Fitness, made personal</title>
+  <meta name="description" content="A personal fitness dashboard to track workouts, nutrition, hydration and progress.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#" aria-label="FitTrack home"><span class="brand-mark">F</span><span>fittrack<span class="brand-dot">.</span><small>YOUR PERSONAL FITNESS OS</small></span></a>
+      <div class="nav-label">WORKSPACE</div>
+      <nav id="main-nav" class="main-nav">
+        <button class="nav-item active" data-view="overview"><span>◫</span> Overview</button>
+        <button class="nav-item" data-view="workouts"><span>↗</span> Workouts</button>
+        <button class="nav-item" data-view="nutrition"><span>◉</span> Nutrition</button>
+        <button class="nav-item" data-view="hydration"><span>♧</span> Hydration</button>
+        <button class="nav-item" data-view="progress"><span>⌁</span> Progress</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="coach-card"><div class="coach-icon">✳</div><b>Consistency wins.</b><p>Show up for yourself today. The results will follow.</p><div class="coach-line"><span></span></div><small>YOUR DAILY REMINDER</small></div>
+        <div class="profile"><div class="avatar">S</div><div><b>Your fitness space</b><small>PERSONAL DASHBOARD</small></div><span class="profile-dots">•••</span></div>
+      </div>
+    </aside>
+    <main class="main-area">
+      <header class="topbar"><div class="mobile-brand"><span class="brand-mark">F</span> fittrack<span class="brand-dot">.</span></div><div class="breadcrumb">Workspace <span>/</span> <b id="crumb">Overview</b></div><div class="top-actions"><span class="today-pill"><span class="live-dot"></span> YOUR DAILY CHECK-IN</span><button id="reset-demo" class="icon-btn" title="Reset demo data" aria-label="Reset demo data">↻</button><div class="avatar small-avatar">S</div></div></header>
+      <section id="view" class="view" aria-live="polite"></section>
+      <footer>FITTRACK <span>•</span> BUILT FOR PROGRESS, NOT PERFECTION</footer>
+    </main>
+  </div>
+  <div id="toast" class="toast" role="status"></div>
+  <script src="app.js"></script>
+</body>
+</html>
