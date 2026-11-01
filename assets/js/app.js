@@ -38,7 +38,8 @@
     favourites: "foodiehub.favourites.v2",
     theme: "foodiehub.theme.v2",
     orders: "foodiehub.orders.v2",
-    profile: "foodiehub.profile.v1"
+    profile: "foodiehub.profile.v1",
+    rewards: "foodiehub.rewards.v1"
   };
 
   const state = {
@@ -57,7 +58,12 @@
     sort: "recommended",
     onlyFavourites: false,
     coupon: null,
-    backendOnline: false
+    backendOnline: false,
+    rewards: readStore(STORAGE.rewards, { points: 0, lifetime: 0 }),
+    pendingRewardRedemption: false,
+    adminKey: "",
+    adminOrders: [],
+    adminSource: "none"
   };
 
   function readStore(key, fallback) {
@@ -456,6 +462,7 @@
     if (state.coupon && subtotal >= state.coupon.minimum) {
       couponDiscount = Math.min(Math.round(subtotal * state.coupon.percent / 100), state.coupon.maximum);
     }
+    if (state.coupon && state.coupon.fixed && subtotal >= (state.coupon.minimum || 0)) couponDiscount = Math.min(Number(state.coupon.fixed), subtotal);
     const delivery = subtotal === 0 || subtotal >= 499 ? 0 : 39;
     const taxable = Math.max(0, subtotal - couponDiscount);
     const tax = Math.round(taxable * 0.05);
@@ -533,17 +540,22 @@
     const code = $("#couponInput").value.trim().toUpperCase();
     const coupons = {
       HUB50: { code: "HUB50", percent: 50, maximum: 200, minimum: 699 },
-      FOOD25: { code: "FOOD25", percent: 25, maximum: 100, minimum: 299 }
+      FOOD25: { code: "FOOD25", percent: 25, maximum: 100, minimum: 299 },
+      COMBO10: { code: "COMBO10", percent: 10, maximum: 150, minimum: 199 },
+      REWARD25: { code: "REWARD25", fixed: 25, percent: 0, maximum: 25, minimum: 249 }
     };
     if (!coupons[code]) {
+      state.pendingRewardRedemption = false;
       state.coupon = null;
       $("#couponMessage").textContent = "That code doesn't look right. Try HUB50 or FOOD25.";
       $("#couponMessage").className = "coupon-message message-warning";
     } else if (calculateBill().subtotal < coupons[code].minimum) {
+      state.pendingRewardRedemption = code === "REWARD25";
       state.coupon = coupons[code];
       $("#couponMessage").textContent = "Add " + money(coupons[code].minimum - calculateBill().subtotal) + " more to unlock " + code + ".";
       $("#couponMessage").className = "coupon-message message-warning";
     } else {
+      state.pendingRewardRedemption = code === "REWARD25";
       state.coupon = coupons[code];
       $("#couponMessage").textContent = code + " applied. Your discount is ready.";
       $("#couponMessage").className = "coupon-message message-success";
@@ -608,6 +620,14 @@
         };
         saveLocalOrder({ ...order, phone: customer.phone, items: payload.items, customer });
       }
+      const appliedCouponCode = state.coupon ? state.coupon.code : "";
+      if (appliedCouponCode === "REWARD25" && state.pendingRewardRedemption) state.rewards.points = Math.max(0, Number(state.rewards.points || 0) - 50);
+      const pointsEarned = Math.max(0, Math.floor(Number(order.total || calculateBill().total) / 10));
+      state.rewards.points = Number(state.rewards.points || 0) + pointsEarned;
+      state.rewards.lifetime = Number(state.rewards.lifetime || 0) + pointsEarned;
+      saveStore(STORAGE.rewards, state.rewards);
+      state.pendingRewardRedemption = false;
+      renderRewards();
       if ($("#saveCheckoutProfile").checked) {
         state.profile = customer;
         saveStore(STORAGE.profile, state.profile);
@@ -619,9 +639,9 @@
       renderCart();
       closeDialog("checkoutDialog");
       $("#successOrderNumber").textContent = order.orderNumber;
-      $("#successMessage").textContent = state.backendOnline
+      $("#successMessage").textContent = (state.backendOnline
         ? "Your order has been saved. Keep this number handy for updates."
-        : "This demo order is saved in this browser only. Connect the backend to save orders centrally.";
+        : "This demo order is saved in this browser only. Connect the backend to save orders centrally.") + (pointsEarned ? " You earned " + pointsEarned + " Foodie Points!" : "");
       openDialog("successDialog");
     } catch (error) {
       $("#checkoutError").textContent = error.message || "We couldn't place that order. Please try again.";
@@ -655,8 +675,22 @@
         if (!order) throw new Error("No matching demo order was found on this device.");
       }
       const result = $("#trackingResult");
-      const status = String(order.status || "confirmed").replace(/_/g, " ");
-      result.innerHTML = '<span class="tracking-status-dot"></span><span class="drawer-kicker">ORDER ' + escapeHTML(order.orderNumber) + '</span><h3>' + escapeHTML(status.replace(/\b\w/g, letter => letter.toUpperCase())) + '</h3><p>' + escapeHTML(order.message || "Your order details are up to date.") + '</p><div class="tracking-total"><span>Order total</span><strong>' + money(order.total) + '</strong></div>';
+      const rawStatus = String(order.status || "confirmed").toLowerCase();
+      const stages = [
+        { key: "confirmed", label: "Order placed", detail: "We've received your order." },
+        { key: "preparing", label: "Preparing", detail: "The kitchen is working on it." },
+        { key: "out_for_delivery", label: "On the way", detail: "Your order is heading your way." },
+        { key: "delivered", label: "Delivered", detail: "Enjoy every bite!" }
+      ];
+      const currentStage = rawStatus === "demo_saved" ? 0 : stages.findIndex(stage => stage.key === rawStatus);
+      const isCancelled = rawStatus === "cancelled";
+      const stageMarkup = stages.map((stage, index) => {
+        const complete = !isCancelled && currentStage >= index;
+        const active = !isCancelled && currentStage === index;
+        return '<li class="tracking-step ' + (complete ? "is-complete " : "") + (active ? "is-current" : "") + '"><span class="tracking-step-mark">' + (complete ? "✓" : String(index + 1)) + '</span><span><strong>' + stage.label + '</strong><small>' + stage.detail + '</small></span></li>';
+      }).join("");
+      const statusLabel = isCancelled ? "Order cancelled" : (rawStatus === "demo_saved" ? "Demo order received" : (stages[Math.max(0, currentStage)] || stages[0]).label);
+      result.innerHTML = '<span class="tracking-status-dot' + (isCancelled ? ' is-cancelled' : '') + '"></span><span class="drawer-kicker">ORDER ' + escapeHTML(order.orderNumber) + '</span><h3>' + escapeHTML(statusLabel) + '</h3><p>' + escapeHTML(order.message || "Your order details are up to date.") + '</p>' + (isCancelled ? '<p class="tracking-cancelled">This order was cancelled. Please contact the team if you need help.</p>' : '<ol class="tracking-steps">' + stageMarkup + '</ol>') + '<div class="tracking-total"><span>Order total</span><strong>' + money(order.total) + '</strong></div>';
       result.hidden = false;
     } catch (error) {
       $("#trackingError").textContent = error.message || "We couldn't find that order.";
@@ -678,6 +712,149 @@
     } catch (error) {
       message.textContent = error.message;
     }
+  }
+
+
+  const SMART_COMBOS = [
+    { id:"house",title:"The House Favourite",subtitle:"A classic burger-night trio",ids:["truffle-mushroom-burger","classic-masala-fries","mint-lime-cooler"],tag:"BEST LOVED" },
+    { id:"fire",title:"The Fire & Crunch",subtitle:"A spicy, crispy little lineup",ids:["peri-peri-paneer-burger","loaded-peri-peri-fries","mango-milkshake"],tag:"SPICE PICK" },
+    { id:"slow",title:"The Slow Evening",subtitle:"Comfort food with a sweet finish",ids:["creamy-pink-sauce-pasta","dark-chocolate-lava-cake","iced-mocha"],tag:"COMFORT SET" }
+  ];
+  function findMenuItem(id){return state.menu.find(item=>item.id===id);}
+  function mealOptions(categories,veg){return state.menu.filter(item=>categories.includes(item.category)&&(!veg||item.isVeg));}
+  function fillMealSelect(id,categories,veg){
+    const select=$("#"+id),previous=select.value,items=mealOptions(categories,veg);
+    select.innerHTML=items.map(item=>'<option value="'+escapeHTML(item.id)+'">'+escapeHTML(item.name)+' · '+money(item.price)+'</option>').join("");
+    if(items.some(item=>item.id===previous))select.value=previous;
+  }
+  function populateMealBuilder(){
+    const veg=$("#mealVegOnly").checked;
+    fillMealSelect("mealMain",["Burgers","Pizza","Pasta","Bowls","Indian"],veg);
+    fillMealSelect("mealSide",["Sides"],veg);
+    fillMealSelect("mealDrink",["Drinks"],veg);
+    updateMealSummary();
+  }
+  function getMealSelection(){return ["mealMain","mealSide","mealDrink"].map(id=>findMenuItem($("#"+id).value)).filter(Boolean);}
+  function updateMealSummary(){
+    const picks=getMealSelection(),total=picks.reduce((sum,item)=>sum+Number(item.price||0),0),complete=picks.length===3;
+    $("#mealSummaryCount").textContent=picks.length+" / 3 picks";
+    $("#mealBuilderTotal").textContent=money(total);
+    $("#addMealBundle").disabled=!complete;
+    $("#mealBuilderSaving").textContent=!complete?"Choose a main, side and drink to see your total.":total>=199?"COMBO10 can save "+money(Math.min(Math.round(total*.1),150))+" on this eligible combo.":"Add a little more to reach the ₹199 COMBO10 minimum.";
+  }
+  function addMealBundle(){
+    const picks=getMealSelection();if(picks.length!==3)return;
+    picks.forEach(item=>{state.cart[item.id]=Math.min(20,(state.cart[item.id]||0)+1);});
+    if(calculateBill().subtotal>=199){
+      state.coupon={code:"COMBO10",percent:10,maximum:150,minimum:199};state.pendingRewardRedemption=false;
+      $("#couponInput").value="COMBO10";$("#couponMessage").textContent="COMBO10 added for 10% off eligible orders.";$("#couponMessage").className="coupon-message message-success";
+    }
+    saveStore(STORAGE.cart,state.cart);renderCart();showToast("Your custom meal has been added to the bag.");
+  }
+  function renderSmartCombos(){
+    const container=$("#comboGrid");if(!container||!state.menu.length)return;
+    container.innerHTML=SMART_COMBOS.map(combo=>{
+      const items=combo.ids.map(findMenuItem).filter(Boolean);if(items.length!==3)return "";
+      const subtotal=items.reduce((sum,item)=>sum+item.price,0),saving=Math.min(Math.round(subtotal*.1),150),hero=items[0];
+      return '<article class="combo-card"><div class="combo-image"><img src="'+escapeHTML(hero.image)+'" alt="'+escapeHTML(hero.name)+'" loading="lazy"><span>'+escapeHTML(combo.tag)+'</span><strong>'+money(subtotal)+'</strong></div><div class="combo-card-body"><h3>'+escapeHTML(combo.title)+'</h3><p>'+escapeHTML(combo.subtitle)+'</p><ul>'+items.map(item=>'<li><span>'+escapeHTML(item.name)+'</span><strong>'+money(item.price)+'</strong></li>').join("")+'</ul><div class="combo-card-footer"><span>Save up to '+money(saving)+' with COMBO10</span><button type="button" class="button button-outline" data-combo="'+combo.id+'">Add combo <span aria-hidden="true">＋</span></button></div></div></article>';
+    }).join("");
+    $$("#comboGrid img").forEach(img=>{const item=state.menu.find(entry=>entry.name===img.alt);if(item)protectFoodPhoto(img,item);});
+  }
+  function addSmartCombo(comboId){
+    const combo=SMART_COMBOS.find(entry=>entry.id===comboId);if(!combo)return;
+    const items=combo.ids.map(findMenuItem).filter(Boolean);if(items.length!==3)return;
+    items.forEach(item=>{state.cart[item.id]=Math.min(20,(state.cart[item.id]||0)+1);});
+    state.coupon={code:"COMBO10",percent:10,maximum:150,minimum:199};state.pendingRewardRedemption=false;
+    $("#couponInput").value="COMBO10";$("#couponMessage").textContent="COMBO10 added. Your eligible bag gets 10% off.";"";
+    $("#couponMessage").className="coupon-message message-success";saveStore(STORAGE.cart,state.cart);renderCart();showToast(combo.title+" added. COMBO10 is ready in your bag.");
+  }
+  function getRecommendedItems(mood){
+    let items=[...state.menu];
+    if(mood==="budget")items=items.filter(item=>item.price<=200).sort((a,b)=>a.price-b.price);
+    else if(mood==="quick")items=items.filter(item=>Number(item.prepTime)<=12).sort((a,b)=>a.prepTime-b.prepTime);
+    else if(mood==="veg")items=items.filter(item=>item.isVeg).sort((a,b)=>Number(b.featured)-Number(a.featured));
+    else if(mood==="sweet")items=items.filter(item=>item.category==="Desserts");
+    else items=items.filter(item=>item.featured).sort((a,b)=>Number(b.featured)-Number(a.featured));
+    return items.slice(0,3);
+  }
+  function renderRecommendations(){
+    const container=$("#recommendationGrid");if(!container||!state.menu.length)return;
+    const items=getRecommendedItems($("#recommendationMood").value||"popular");
+    if(!items.length){container.innerHTML='<p class="recommendation-empty">No matches in that mood yet. Try another pick.</p>';return;}
+    container.innerHTML=items.map(item=>'<article class="recommendation-card"><img src="'+escapeHTML(item.image)+'" alt="'+escapeHTML(item.name)+'" loading="lazy"><div class="recommendation-card-copy"><span>'+escapeHTML(item.category)+' · '+escapeHTML(String(item.prepTime||"—"))+' min</span><h3>'+escapeHTML(item.name)+'</h3><p>'+escapeHTML(item.description)+'</p><div><strong>'+money(item.price)+'</strong><button type="button" class="button button-outline" data-recommend-add="'+escapeHTML(item.id)+'">Add <span aria-hidden="true">＋</span></button></div></div></article>').join("");
+    $$("#recommendationGrid img").forEach(img=>{const item=state.menu.find(entry=>entry.name===img.alt);if(item)protectFoodPhoto(img,item);});
+  }
+  function renderRewards(){
+    const points=Math.max(0,Number(state.rewards.points||0)),lifetime=Math.max(0,Number(state.rewards.lifetime||0)),progress=points%50;
+    $("#rewardPoints").textContent=points.toLocaleString("en-IN");$("#rewardLifetime").textContent=lifetime.toLocaleString("en-IN")+" lifetime points";
+    $("#rewardProgressFill").style.width=(progress/50*100)+"%";$("#rewardProgressText").textContent=progress+" / 50 points to your next reward";
+    $("#redeemRewards").disabled=points<50;
+    $("#rewardMessage").textContent=points>=50?"You have a reward ready. Orders above ₹249 can use it.":"Earn 1 point for every ₹10 spent. Points stay in this browser in this demo.";
+  }
+  function redeemRewards(){
+    const points=Math.max(0,Number(state.rewards.points||0));
+    if(points<50){showToast("You need 50 Foodie Points to redeem this reward.","error");return;}
+    if(calculateBill().subtotal<249){showToast("Add at least ₹249 to your bag before redeeming.","error");return;}
+    state.coupon={code:"REWARD25",fixed:25,percent:0,maximum:25,minimum:249};state.pendingRewardRedemption=true;
+    $("#couponInput").value="REWARD25";$("#couponMessage").textContent="50 points will be redeemed for ₹25 off when you place this order.";
+    $("#couponMessage").className="coupon-message message-success";renderCart();showToast("Reward unlocked. Complete checkout to use it!");
+  }
+  function normalizeAdminStatus(status){return status==="demo_saved"?"confirmed":(status||"confirmed");}
+  function renderAdminDashboard(){
+    const orders=state.adminOrders||[],revenue=orders.reduce((sum,order)=>sum+Number(order.total||0),0);
+    $("#adminOrderCount").textContent=orders.length.toLocaleString("en-IN");$("#adminRevenue").textContent=money(revenue);
+    $("#adminAverage").textContent=orders.length?money(revenue/orders.length):money(0);
+    $("#adminSourceLabel").textContent=state.adminSource==="live"?"LIVE BACKEND":"LOCAL DEMO";
+    if(!orders.length){$("#adminOrdersBody").innerHTML='<tr><td colspan="5">No orders yet.</td></tr>';return;}
+    $("#adminOrdersBody").innerHTML=orders.map(order=>{
+      const number=order.order_number||order.orderNumber||"FH-UNKNOWN",name=order.customer_name||(order.customer&&order.customer.name)||"Demo customer",status=normalizeAdminStatus(order.status);
+      const choices=["confirmed","preparing","out_for_delivery","delivered","cancelled"],itemCount=Array.isArray(order.items)?order.items.reduce((sum,item)=>sum+Number(item.quantity||1),0):0;
+      return '<tr data-admin-row="'+escapeHTML(number)+'"><td><strong>'+escapeHTML(number)+'</strong><small>'+itemCount+' items</small></td><td>'+escapeHTML(name)+'</td><td>'+money(order.total)+'</td><td><select data-admin-status aria-label="Status for '+escapeHTML(number)+'">'+choices.map(choice=>'<option value="'+choice+'"'+(choice===status?" selected":"")+'>'+choice.replace(/_/g," ")+'</option>').join("")+'</select></td><td><button type="button" class="button button-outline admin-update-button" data-admin-update="'+escapeHTML(number)+'">Save</button></td></tr>';
+    }).join("");
+  }
+  async function connectAdmin(event){
+    event.preventDefault();const key=$("#adminKey").value.trim();$("#adminError").textContent="";
+    if(state.backendOnline){
+      if(!key){$("#adminError").textContent="Enter the server admin key to continue.";return;}
+      try{
+        const result=await request("/api/admin/orders",{headers:{Authorization:"Bearer "+key}});
+        state.adminKey=key;state.adminSource="live";state.adminOrders=Array.isArray(result.orders)?result.orders:[];
+        $("#adminConnection").textContent="Connected to the hosted FoodieHub API. Changes update the shared orders database.";renderAdminDashboard();
+      }catch(error){state.adminKey="";$("#adminError").textContent=error.message||"Admin connection failed.";}
+      return;
+    }
+    state.adminKey="";state.adminSource="demo";
+    state.adminOrders=state.orders.map(order=>({...order,customer_name:(order.customer&&order.customer.name)||"This browser",order_number:order.orderNumber,total:order.total}));
+    $("#adminConnection").textContent="Backend is not connected on this GitHub Pages site. Showing local demo orders from this browser only. Configure FOODIEHUB_API_URL and ADMIN_API_KEY for live management.";
+    renderAdminDashboard();
+  }
+  async function updateAdminOrder(button){
+    const row=button.closest("[data-admin-row]");if(!row)return;
+    const number=row.dataset.adminRow,status=$("[data-admin-status]",row).value;button.disabled=true;
+    try{
+      if(state.adminSource==="live"){
+        await request("/api/admin/orders/"+encodeURIComponent(number),{method:"PATCH",headers:{Authorization:"Bearer "+state.adminKey},body:JSON.stringify({status})});
+        const found=state.adminOrders.find(order=>(order.order_number||order.orderNumber)===number);if(found)found.status=status;
+        $("#adminConnection").textContent="Order "+number+" updated in the live database.";
+      }else{
+        const found=state.orders.find(order=>order.orderNumber===number);if(found)found.status=status;
+        saveStore(STORAGE.orders,state.orders);state.adminOrders=state.orders.map(order=>({...order,customer_name:(order.customer&&order.customer.name)||"This browser",order_number:order.orderNumber,total:order.total}));
+        $("#adminConnection").textContent="Demo status saved on this browser only. It is not a live delivery update.";
+      }
+      renderAdminDashboard();showToast("Order status updated.");
+    }catch(error){$("#adminError").textContent=error.message||"The order status could not be updated.";}
+    finally{button.disabled=false;}
+  }
+  function bindFeatureEvents(){
+    ["mealMain","mealSide","mealDrink"].forEach(id=>$("#"+id).addEventListener("change",updateMealSummary));
+    $("#mealVegOnly").addEventListener("change",populateMealBuilder);$("#addMealBundle").addEventListener("click",addMealBundle);
+    $("#comboGrid").addEventListener("click",event=>{const button=event.target.closest("[data-combo]");if(button)addSmartCombo(button.dataset.combo);});
+    $("#recommendationMood").addEventListener("change",renderRecommendations);
+    $("#recommendationGrid").addEventListener("click",event=>{const button=event.target.closest("[data-recommend-add]");if(button)addToCart(button.dataset.recommendAdd,button);});
+    $("#redeemRewards").addEventListener("click",redeemRewards);
+    $("#openAdmin").addEventListener("click",()=>{$("#adminError").textContent="";openDialog("adminDialog");});
+    $("#adminLoginForm").addEventListener("submit",connectAdmin);
+    $("#adminOrdersBody").addEventListener("click",event=>{const button=event.target.closest("[data-admin-update]");if(button)updateAdminOrder(button);});
   }
 
   function setTheme(theme) {
@@ -702,6 +879,7 @@
     $("#checkoutForm").addEventListener("submit", placeOrder);
     $("#trackingForm").addEventListener("submit", trackOrder);
     $("#trackOrderLink").addEventListener("click", openTracking);
+    bindFeatureEvents();
     $("#successDone").addEventListener("click", () => closeDialog("successDialog"));
     $("#newsletterForm").addEventListener("submit", subscribe);
     $("#themeToggle").addEventListener("click", () => setTheme(document.documentElement.dataset.theme === "dark" ? "light" : "dark"));
@@ -769,6 +947,10 @@
       renderCart();
       renderCategories();
       renderMenu();
+      populateMealBuilder();
+      renderSmartCombos();
+      renderRecommendations();
+      renderRewards();
       if (state.backendOnline) {
         showToast("FoodieHub API connected. Orders can be saved.");
       }

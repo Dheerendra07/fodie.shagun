@@ -15,9 +15,9 @@
   <link rel="preconnect" href="https://images.unsplash.com">
   <link rel="preconnect" href="https://images.pexels.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Serif+Display&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./assets/css/styles.css?v=readable-glass-20261102">
+  <link rel="stylesheet" href="./assets/css/styles.css?v=six-features-20261102">
   <script src="./assets/js/config.js"></script>
-  <script defer src="./assets/js/app.js"></script>
+  <script defer src="./assets/js/app.js?v=six-features-20261102"></script>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -45,6 +45,8 @@
       <nav class="desktop-nav" aria-label="Main navigation">
         <a class="nav-link active" href="#menu">Explore menu</a>
         <a class="nav-link" href="#offers">Offers</a>
+        <a class="nav-link" href="#meal-studio">Meal studio</a>
+        <a class="nav-link" href="#rewards">Rewards</a>
         <a class="nav-link" href="#about">Our story</a>
       </nav>
 
@@ -178,6 +180,34 @@
       </div>
     </section>
 
+
+    <section class="feature-section page-width meal-studio-section" id="meal-studio" aria-labelledby="mealStudioTitle">
+      <div class="feature-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> YOUR PLATE, YOUR RULES</div><h2 id="mealStudioTitle">Build your <em>own meal.</em></h2><p>Pick a main, a side and a drink. Your choices land together in your bag.</p></div><span class="feature-index">01 / MEAL STUDIO</span></div>
+      <div class="meal-builder-shell">
+        <div class="meal-builder-controls">
+          <label class="feature-field">01 <span>Choose your main</span><select id="mealMain" required><option value="">Loading menu...</option></select></label>
+          <label class="feature-field">02 <span>Add a side</span><select id="mealSide" required><option value="">Loading menu...</option></select></label>
+          <label class="feature-field">03 <span>Pick a drink</span><select id="mealDrink" required><option value="">Loading menu...</option></select></label>
+          <label class="meal-veg-toggle"><input id="mealVegOnly" type="checkbox"><span class="veg-mini"></span> Keep my whole meal vegetarian</label>
+        </div>
+        <aside class="meal-builder-summary"><span class="drawer-kicker">YOUR CUSTOM COMBO</span><div class="meal-summary-items"><span>Main + side + drink</span><strong id="mealSummaryCount">3 picks</strong></div><div class="meal-summary-total"><span>Combo subtotal</span><strong id="mealBuilderTotal">₹0</strong></div><div class="meal-summary-saving" id="mealBuilderSaving">Choose all three items to see your total.</div><button class="button button-primary" id="addMealBundle" type="button" disabled>Add my meal <span aria-hidden="true">↗</span></button><small>COMBO10 gives 10% off eligible orders above ₹199.</small></aside>
+      </div>
+    </section>
+
+    <section class="feature-section page-width combo-section" id="smart-combos" aria-labelledby="comboTitle">
+      <div class="feature-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> GOOD THINGS GO TOGETHER</div><h2 id="comboTitle">Smart <em>combos.</em></h2><p>Three ready-made pairings for the days you don't feel like deciding.</p></div><span class="feature-index">02 / CURATED SETS</span></div>
+      <div class="combo-grid" id="comboGrid" aria-live="polite"></div>
+    </section>
+
+    <section class="feature-section page-width recommendation-section" id="smart-picks" aria-labelledby="recommendationTitle">
+      <div class="feature-heading recommendation-heading"><div><div class="eyebrow"><span class="eyebrow-line"></span> A LITTLE NUDGE IN THE RIGHT DIRECTION</div><h2 id="recommendationTitle">Your next <em>good bite.</em></h2><p>Choose a craving and we'll shortlist dishes using the menu's real prices, tags and prep times.</p></div><label class="recommendation-filter">I'm in the mood for<select id="recommendationMood"><option value="popular">Chef's favourites</option><option value="budget">Something under ₹200</option><option value="quick">A quick bite</option><option value="veg">Vegetarian picks</option><option value="sweet">Something sweet</option></select></label></div>
+      <div class="recommendation-grid" id="recommendationGrid" aria-live="polite"></div><p class="recommendation-note">Smart picks are rule-based menu suggestions, not medical or nutrition advice.</p>
+    </section>
+
+    <section class="feature-section page-width rewards-section" id="rewards" aria-labelledby="rewardsTitle">
+      <div class="rewards-panel"><div class="rewards-copy"><span class="drawer-kicker">GOOD FOOD. LITTLE PERKS.</span><h2 id="rewardsTitle">Every order brings you <em>closer to a treat.</em></h2><p>Earn 1 Foodie Point for every ₹10 spent. Redeem 50 points for ₹25 off an eligible order.</p><div class="rewards-progress"><div class="rewards-progress-track"><span id="rewardProgressFill"></span></div><div class="rewards-progress-label"><span id="rewardProgressText">0 / 50 points to your next reward</span><strong id="rewardLifetime">0 lifetime points</strong></div></div><button class="button button-primary" id="redeemRewards" type="button" disabled>Redeem 50 points for ₹25 off</button><small id="rewardMessage">Your points are stored in this browser for this demo experience.</small></div><div class="rewards-score"><span class="reward-star">✦</span><strong id="rewardPoints">0</strong><span>FOODIE POINTS</span><small>YOUR LITTLE REWARD WALLET</small></div></div>
+    </section>
+
     <section class="story-section page-width" id="about" aria-labelledby="storyTitle">
       <div class="story-image">
         <img src="https://images.unsplash.com/photo-1556911220-bff31c812dba?auto=format&fit=crop&w=1100&q=85" alt="A chef preparing fresh ingredients in a warm kitchen" loading="lazy">
@@ -210,7 +240,7 @@
         <p>A little indulgence, delivered. Good food, great mood, every single time.</p>
       </div>
       <div class="footer-column"><h3>Explore</h3><a href="#menu">The menu</a><a href="#offers">Today's offers</a><a href="#about">Our story</a></div>
-      <div class="footer-column"><h3>Need a hand?</h3><button type="button" class="footer-action" id="trackOrderLink">Track an order</button><a href="mailto:hello@foodiehub.example">Get in touch</a><span class="footer-muted">Demo ordering experience</span></div>
+      <div class="footer-column"><h3>Need a hand?</h3><button type="button" class="footer-action" id="trackOrderLink">Track an order</button><button type="button" class="footer-action" id="openAdmin">Team dashboard</button><a href="mailto:hello@foodiehub.example">Get in touch</a><span class="footer-muted">Demo ordering experience</span></div>
       <div class="footer-newsletter">
         <h3>A little something in your inbox.</h3>
         <p>New dishes, fresh deals and good-food energy.</p>
@@ -357,6 +387,19 @@
       <button class="button button-primary" type="submit">Find my order <span aria-hidden="true">→</span></button>
     </form>
     <div class="tracking-result" id="trackingResult" hidden></div>
+  </dialog>
+
+
+  <dialog class="site-dialog admin-dialog" id="adminDialog" aria-labelledby="adminTitle">
+    <div class="dialog-header"><div><span class="drawer-kicker">FOODIEHUB OPERATIONS</span><h2 id="adminTitle">Team dashboard.</h2></div><button class="close-button" type="button" data-close-dialog="adminDialog" aria-label="Close dashboard">×</button></div>
+    <div class="admin-content">
+      <form id="adminLoginForm" class="admin-login-form"><label class="form-field">Server admin key<input id="adminKey" name="adminKey" type="password" placeholder="Enter the key configured on your backend" autocomplete="off"></label><button class="button button-primary" type="submit">Connect dashboard <span aria-hidden="true">↗</span></button></form>
+      <p class="admin-connection-note" id="adminConnection" aria-live="polite">Connect a hosted backend to manage live orders. Without one, this panel shows demo orders saved in this browser only.</p><p class="form-error" id="adminError" role="alert"></p>
+      <div class="admin-stats"><article><span>ORDERS</span><strong id="adminOrderCount">0</strong></article><article><span>GROSS SALES</span><strong id="adminRevenue">₹0</strong></article><article><span>AVERAGE ORDER</span><strong id="adminAverage">₹0</strong></article></div>
+      <div class="admin-table-heading"><div><span class="drawer-kicker">THE LATEST ACTIVITY</span><h3>Order management</h3></div><span id="adminSourceLabel">Not connected</span></div>
+      <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Order</th><th>Customer</th><th>Total</th><th>Status</th><th>Update</th></tr></thead><tbody id="adminOrdersBody"><tr><td colspan="5">Connect the dashboard to view orders.</td></tr></tbody></table></div>
+      <p class="admin-security-note">The admin key stays in page memory only. Configure <code>ADMIN_API_KEY</code> on the Node server to enable live order management.</p>
+    </div>
   </dialog>
 
   <dialog class="site-dialog success-dialog" id="successDialog" aria-labelledby="successTitle">

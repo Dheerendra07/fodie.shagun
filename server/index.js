@@ -72,7 +72,9 @@ function calculateCoupon(code, subtotal) {
   const normalized = String(code || "").trim().toUpperCase();
   const offers = {
     HUB50: { percent: 50, max: 200, minimum: 699 },
-    FOOD25: { percent: 25, max: 100, minimum: 299 }
+    FOOD25: { percent: 25, max: 100, minimum: 299 },
+    COMBO10: { percent: 10, max: 150, minimum: 199 },
+    REWARD25: { fixed: 25, minimum: 249 }
   };
   const offer = offers[normalized];
   if (!offer) return { code: "", discount: 0 };
@@ -81,7 +83,8 @@ function calculateCoupon(code, subtotal) {
     error.status = 400;
     throw error;
   }
-  return { code: normalized, discount: Math.min(round(subtotal * offer.percent / 100), offer.max) };
+  const discount = offer.fixed ? Math.min(offer.fixed, subtotal) : Math.min(round(subtotal * offer.percent / 100), offer.max);
+  return { code: normalized, discount };
 }
 function calculateOrder(items, couponCode) {
   if (!Array.isArray(items) || items.length < 1 || items.length > 30) {
