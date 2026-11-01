@@ -25,14 +25,36 @@
       </nav>
       <div class="sidebar-bottom">
         <div class="coach-card"><div class="coach-icon">✳</div><b>Consistency wins.</b><p>Show up for yourself today. The results will follow.</p><div class="coach-line"><span></span></div><small>YOUR DAILY REMINDER</small></div>
-        <div class="profile"><div class="avatar">S</div><div><b>Your fitness space</b><small>PERSONAL DASHBOARD</small></div><span class="profile-dots">•••</span></div>
+        <div class="profile-wrap">
+          <button class="profile profile-open" id="open-profile" type="button" aria-label="Open your profile">
+            <span class="avatar" id="profile-avatar">S</span>
+            <span class="profile-copy"><b id="profile-name">Your fitness space</b><small>PERSONAL DASHBOARD</small></span>
+          </button>
+          <button class="profile-dots" id="profile-menu-toggle" type="button" aria-label="Open profile options" aria-expanded="false">•••</button>
+          <div class="profile-menu" id="profile-menu" hidden>
+            <button type="button" data-profile-action="edit">Edit profile</button>
+            <button type="button" data-profile-action="export">Export my data</button>
+            <button type="button" data-profile-action="reset">Reset app data</button>
+            <button type="button" data-profile-action="about">About FitTrack</button>
+          </div>
+        </div>
       </div>
     </aside>
     <main class="main-area">
-      <header class="topbar"><div class="mobile-brand"><span class="brand-mark">F</span> fittrack<span class="brand-dot">.</span></div><div class="breadcrumb">Workspace <span>/</span> <b id="crumb">Overview</b></div><div class="top-actions"><span class="today-pill"><span class="live-dot"></span> YOUR DAILY CHECK-IN</span><button id="reset-demo" class="icon-btn" title="Reset demo data" aria-label="Reset demo data">↻</button><div class="avatar small-avatar">S</div></div></header>
+      <header class="topbar"><div class="mobile-brand"><span class="brand-mark">F</span> fittrack<span class="brand-dot">.</span></div><div class="breadcrumb">Workspace <span>/</span> <b id="crumb">Overview</b></div><div class="top-actions"><span class="today-pill"><span class="live-dot"></span> YOUR DAILY CHECK-IN</span><button id="reset-demo" class="icon-btn" title="Reset demo data" aria-label="Reset demo data">↻</button><button class="avatar small-avatar" id="open-profile-top" type="button" aria-label="Open your profile">S</button></div></header>
       <section id="view" class="view" aria-live="polite"></section>
       <footer>FITTRACK <span>•</span> BUILT FOR PROGRESS, NOT PERFECTION</footer>
     </main>
+  </div>
+  <div id="profile-modal" class="modal-backdrop" hidden>
+    <section class="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
+      <div class="modal-head"><div><div class="eyebrow">YOUR SPACE</div><h2 id="profile-modal-title">Your profile</h2></div><button type="button" class="modal-close" id="close-profile" aria-label="Close profile">×</button></div>
+      <form id="profile-form">
+        <div class="field"><label for="profile-display-name">DISPLAY NAME</label><input id="profile-display-name" name="displayName" maxlength="32" required placeholder="Your name"></div>
+        <div class="profile-summary"><span class="avatar" id="profile-modal-avatar">S</span><div><b id="profile-modal-preview">Your fitness space</b><small>Your profile is stored only in this browser.</small></div></div>
+        <div class="form-actions"><button class="primary-btn" type="submit">Save profile</button><button class="ghost-btn" id="cancel-profile" type="button">Cancel</button></div>
+      </form>
+    </section>
   </div>
   <div id="toast" class="toast" role="status"></div>
   <script src="app.js"></script>
