@@ -6,7 +6,7 @@
 
 /* Functional profile controls, menus and five-set workout tracker */
 .profile-wrap{position:relative;display:flex;align-items:center;gap:5px;border-top:1px solid var(--line);padding:15px 2px 0}
-.profile.profile-open{min-width:0;flex:1;border:0;background:transparent;text-align:left;color:var(--text);padding:0;display:flex;align-items:center;gap:10px;cursor:pointer}
+.profile.profile-open{min-width:0;flex:1;border:0;border-top:0;padding:0;background:transparent;text-align:left;color:var(--text);padding:0;display:flex;align-items:center;gap:10px;cursor:pointer}
 .profile.profile-open:hover .profile-copy b{color:var(--lime)}
 .profile-copy{min-width:0;display:block}.profile-copy b{display:block;font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.profile-copy small{display:block;color:var(--muted);font-size:8px;letter-spacing:.8px;margin-top:4px}
 .profile-dots{width:32px;height:32px;flex-shrink:0;border:1px solid transparent;border-radius:9px;background:transparent;color:#aab6a7;letter-spacing:2px;font-size:12px;cursor:pointer}
