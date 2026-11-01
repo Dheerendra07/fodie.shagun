@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="420" height="104" viewBox="0 0 420 104" role="img" aria-labelledby="title desc">
+<title id="title">FoodieHub logo</title><desc id="desc">A warm bowl with rising steam and a sparkle, beside the FoodieHub wordmark.</desc>
+<g transform="translate(7 5) scale(1.02)">
+  <circle cx="32" cy="33" r="27" fill="none" stroke="#D99A45" stroke-opacity=".34" stroke-width="1.5"/>
+  <path d="M20.5 29.5C15.8 25 22.2 19.8 20.8 14.4" fill="none" stroke="#F0C987" stroke-width="2.7" stroke-linecap="round"/>
+  <path d="M32 28.5C25.9 21.8 35.4 17.5 31.9 9.7" fill="none" stroke="#E78A31" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M43.5 29.5C38.8 25 45.2 20.3 43.8 15.2" fill="none" stroke="#F0C987" stroke-width="2.7" stroke-linecap="round"/>
+  <path d="M13.5 35.5H50.5" fill="none" stroke="#E78A31" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M16.8 36.4C19.2 47.5 25.2 52.6 32 52.6C38.8 52.6 44.8 47.5 47.2 36.4" fill="none" stroke="#F0C987" stroke-width="2.9" stroke-linecap="round"/>
+  <path d="M24.8 55.7H39.2" fill="none" stroke="#E78A31" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M50.6 12.4L52.1 16.1L55.8 17.6L52.1 19.1L50.6 22.8L49.1 19.1L45.4 17.6L49.1 16.1Z" fill="#EFC477"/>
+</g>
+<text x="91" y="55" font-family="Manrope, DM Sans, Arial, sans-serif" font-size="39" font-weight="850" letter-spacing="-2.1" fill="#F7F0E5">Foodie<tspan fill="#E58A32">Hub</tspan></text>
+<text x="94" y="78" font-family="Manrope, DM Sans, Arial, sans-serif" font-size="10.5" font-weight="750" letter-spacing="2.5" fill="#AA9B88">GOOD FOOD  ·  GOOD MOOD</text>
+</svg>
