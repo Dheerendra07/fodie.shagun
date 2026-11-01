@@ -6,47 +6,61 @@ let data;
 try { data = {...initial, ...JSON.parse(localStorage.getItem(KEY) || "{}")}; } catch { data = {...initial}; }
 let currentView = "overview", toastTimer;
 const workouts = [
-  {name:"Bench Press",group:"Chest",emoji:"🏋️"},
-  {name:"Incline Dumbbell Press",group:"Chest",emoji:"💪"},
-  {name:"Decline Bench Press",group:"Chest",emoji:"🏋️"},
-  {name:"Cable Fly",group:"Chest",emoji:"🔩"},
-  {name:"Pec Deck Fly",group:"Chest",emoji:"🪽"},
+  // CHEST: five distinct main movements + one optional
+  {name:"Flat Barbell Bench Press",group:"Chest",emoji:"🏋️"},
+  {name:"Incline Barbell Bench Press",group:"Chest",emoji:"📈"},
+  {name:"Decline Barbell Bench Press",group:"Chest",emoji:"↘️"},
+  {name:"Cable Chest Fly",group:"Chest",emoji:"🔩"},
+  {name:"Flat Dumbbell Chest Press",group:"Chest",emoji:"💪"},
   {name:"Push-Ups",group:"Chest",emoji:"🔥",optional:true},
 
-  {name:"Lat Pulldown",group:"Back",emoji:"🧗"},
+  // BACK: five distinct main movements + one optional
+  {name:"Wide-Grip Lat Pulldown",group:"Back",emoji:"🧗"},
   {name:"Seated Cable Row",group:"Back",emoji:"🚣"},
   {name:"Bent-Over Barbell Row",group:"Back",emoji:"🏋️"},
   {name:"Single-Arm Dumbbell Row",group:"Back",emoji:"💪"},
-  {name:"Straight-Arm Pulldown",group:"Back",emoji:"⬇️"},
+  {name:"Chest-Supported Row",group:"Back",emoji:"↔️"},
   {name:"Conventional Deadlift",group:"Back",emoji:"⚡",optional:true},
 
-  {name:"Overhead Shoulder Press",group:"Shoulders",emoji:"🏋️"},
+  // SHOULDERS: five distinct main movements + one optional
+  {name:"Seated Dumbbell Shoulder Press",group:"Shoulders",emoji:"🏋️"},
   {name:"Dumbbell Lateral Raise",group:"Shoulders",emoji:"🪽"},
-  {name:"Rear Delt Fly",group:"Shoulders",emoji:"🦅"},
-  {name:"Front Raise",group:"Shoulders",emoji:"💪"},
-  {name:"Face Pull",group:"Shoulders",emoji:"↔️"},
-  {name:"Arnold Press",group:"Shoulders",emoji:"🏋️",optional:true},
+  {name:"Dumbbell Front Raise",group:"Shoulders",emoji:"⬆️"},
+  {name:"Reverse Pec Deck Fly",group:"Shoulders",emoji:"🦅"},
+  {name:"Cable Face Pull",group:"Shoulders",emoji:"↔️"},
+  {name:"Arnold Press",group:"Shoulders",emoji:"💪",optional:true},
 
-  {name:"Barbell Squat",group:"Legs",emoji:"🦵"},
-  {name:"Leg Press",group:"Legs",emoji:"🏋️"},
+  // LEGS: five distinct main movements + one optional
+  {name:"Barbell Back Squat",group:"Legs",emoji:"🦵"},
+  {name:"45-Degree Leg Press",group:"Legs",emoji:"🏋️"},
   {name:"Romanian Deadlift",group:"Legs",emoji:"⚡"},
-  {name:"Leg Curl",group:"Legs",emoji:"🦿"},
+  {name:"Seated Leg Curl",group:"Legs",emoji:"🦿"},
   {name:"Leg Extension",group:"Legs",emoji:"🦵"},
   {name:"Standing Calf Raise",group:"Legs",emoji:"⬆️",optional:true},
 
-  {name:"Barbell Bicep Curl",group:"Biceps",emoji:"💪"},
+  // BICEPS: five distinct main movements + one optional
+  {name:"Barbell Biceps Curl",group:"Biceps",emoji:"💪"},
   {name:"Alternating Dumbbell Curl",group:"Biceps",emoji:"🏋️"},
   {name:"Hammer Curl",group:"Biceps",emoji:"🔨"},
-  {name:"Preacher Curl",group:"Biceps",emoji:"💪"},
-  {name:"Concentration Curl",group:"Biceps",emoji:"🎯"},
-  {name:"Cable Bicep Curl",group:"Biceps",emoji:"🔩",optional:true},
+  {name:"EZ-Bar Preacher Curl",group:"Biceps",emoji:"🎯"},
+  {name:"Concentration Curl",group:"Biceps",emoji:"💪"},
+  {name:"Cable Biceps Curl",group:"Biceps",emoji:"🔩",optional:true},
 
-  {name:"Triceps Pushdown",group:"Triceps",emoji:"⚡"},
-  {name:"Overhead Triceps Extension",group:"Triceps",emoji:"🏋️"},
-  {name:"Skull Crusher",group:"Triceps",emoji:"💪"},
+  // TRICEPS: five distinct main movements + one optional
+  {name:"Rope Triceps Pushdown",group:"Triceps",emoji:"⚡"},
+  {name:"Overhead Cable Triceps Extension",group:"Triceps",emoji:"🏋️"},
+  {name:"EZ-Bar Skull Crusher",group:"Triceps",emoji:"💪"},
   {name:"Close-Grip Bench Press",group:"Triceps",emoji:"🏋️"},
   {name:"Dumbbell Triceps Kickback",group:"Triceps",emoji:"🔁"},
-  {name:"Assisted Triceps Dips",group:"Triceps",emoji:"↘️",optional:true}
+  {name:"Assisted Triceps Dips",group:"Triceps",emoji:"↘️",optional:true},
+
+  // CORE: five distinct main movements + one optional
+  {name:"Crunches",group:"Core",emoji:"🔥"},
+  {name:"Reverse Crunches",group:"Core",emoji:"↗️"},
+  {name:"Lying Leg Raises",group:"Core",emoji:"🦵"},
+  {name:"Bicycle Crunches",group:"Core",emoji:"🚴"},
+  {name:"Russian Twists",group:"Core",emoji:"🔄"},
+  {name:"Mountain Climbers",group:"Core",emoji:"⛰️",optional:true}
 ];
 const repScheme = [20,15,12];
 data.setsCompleted = data.setsCompleted || {};
@@ -91,7 +105,7 @@ function renderOverview(){
  card('Your weekly movement',chart(),'ACTIVITY OVERVIEW','<button class="text-link" data-go="progress">See progress →</button>')+'</div>';
 }
 function renderWorkouts(){
- const groups=['All','Chest','Back','Shoulders','Legs','Biceps','Triceps'];
+ const groups=['All','Chest','Back','Shoulders','Legs','Biceps','Triceps','Core'];
  const selected=window.workoutFilter||'All';
  const groupList=selected==='All'?groups.slice(1):[selected];
  const shown=workouts.filter(w=>groupList.includes(w.group)&&(!w.optional||data.optionalAdded.includes(w.name)));
@@ -108,11 +122,11 @@ function renderWorkouts(){
  }).join('');
  const completedCount=workouts.filter(w=>(!w.optional||data.optionalAdded.includes(w.name))&&(data.setsCompleted[w.name]||[]).length===3&&(data.setsCompleted[w.name]||[]).every(Boolean)).length;
  const activeCount=workouts.filter(w=>!w.optional||data.optionalAdded.includes(w.name)).length;
- return head('TRAINING SPACE','Your workout planner.','Each body part has 5 main exercises and 1 optional extra. Every exercise has 3 sets.','<button class="ghost-btn" data-action="clear-workout">Reset checklist</button>')+
+ return head('TRAINING SPACE','Your workout planner.','Chest, Back, Shoulders, Legs, Biceps, Triceps and Core each have 5 different main exercises plus 1 optional extra. Every exercise has 3 sets.','<button class="ghost-btn" data-action="clear-workout">Reset checklist</button>')+
  '<div class="notice">💡 <b>Rep plan for every exercise:</b> Set 1 = 20 reps, Set 2 = 15 reps and Set 3 = 12 reps. Complete the 5 main exercises first. The sixth exercise is optional. Warm up, use controlled form and adjust the load to your ability.</div>'+
  '<div class="chips filter-chips" style="margin-bottom:15px">'+groups.map(g=>'<button class="chip filter-chip '+(selected===g?'selected':'')+'" data-filter="'+g+'">'+g+'</button>').join('')+'</div>'+
  '<div class="exercise-grid">'+cards+optionalCards+'</div>'+
- '<div class="section-title">Session summary</div><div class="card"><div class="row-note"><div><div class="card-title">'+completedCount+' / '+activeCount+' exercises completed</div><div class="card-subtitle">5 main exercises per body part. Optional moves count only after you add them.</div></div><button class="primary-btn" data-action="finish-workout">Finish session ✓</button></div>'+meter(completedCount,activeCount)+'</div>';
+ '<div class="section-title">Session summary</div><div class="card"><div class="row-note"><div><div class="card-title">'+completedCount+' / '+activeCount+' exercises completed</div><div class="card-subtitle">5 different main exercises for each body part. Optional moves count only after you add them.</div></div><button class="primary-btn" data-action="finish-workout">Finish session ✓</button></div>'+meter(completedCount,activeCount)+'</div>';
 }
 function renderNutrition(){
  return head('FUEL YOUR BODY','Nutrition, without the guesswork.','Track meals and get a clearer picture of your daily fuel.','<button class="ghost-btn" data-action="clear-food">Clear today’s log</button>')+
