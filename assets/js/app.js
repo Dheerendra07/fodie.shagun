@@ -1163,7 +1163,7 @@
   let offerSlideIndex=0;
   let offerRotationTimer=null;
   function renderOfferSlide(index,announce=false){
-    const slides=$("#offerCarousel [data-offer-slide]");
+    const slides=$$("#offerCarousel [data-offer-slide]");
     if(!slides.length)return;
     offerSlideIndex=(index+slides.length)%slides.length;
     slides.forEach((slide,i)=>{
