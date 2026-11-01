@@ -20,3 +20,12 @@
 .set-tracker{display:grid;gap:6px;margin:13px 0 10px}.set-row{display:grid;grid-template-columns:52px 1fr auto;align-items:center;gap:9px;padding:8px 9px;border-radius:9px;background:#202a20;border:1px solid #303d30;font-size:10px;color:#b9c5b5}.set-row input{width:15px;height:15px;accent-color:var(--lime);cursor:pointer}.set-row strong{color:#eff6e9;font-size:11px}.set-row.done{border-color:#526c3d;background:#263521}.set-row.done strong{color:var(--lime)}.set-count{font-size:9px;color:var(--muted)}.exercise-card .exercise-status{width:100%;margin-top:4px}.filter-chip{cursor:pointer;font-family:inherit}.filter-chip.selected{background:#35452b;color:var(--lime);border-color:#627b4c}.row-note{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .small-avatar{border:0;cursor:pointer}
 @media(max-width:760px){.sidebar-bottom{display:none}.small-avatar{display:grid}.profile-menu{bottom:auto;top:43px;right:0}.set-row{grid-template-columns:48px 1fr auto}.profile-modal{padding:18px}}
+
+/* Optional body-part exercise cards */
+.exercise-card-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.optional-chip{background:#2b3627;border-color:#556b42;color:var(--lime);font-size:8px;font-weight:800;letter-spacing:.7px}
+.optional-prompt{border-style:dashed;background:#151e16;display:flex;flex-direction:column;align-items:flex-start;justify-content:center;min-height:245px}
+.optional-prompt .emoji{width:38px;height:38px;border-radius:11px;background:#273424;display:grid;place-items:center;color:var(--lime);margin-bottom:12px}
+.optional-prompt p{max-width:250px}
+.optional-prompt .secondary-btn{margin-top:4px}
+.optional-remove{display:block;margin:12px auto 0}
