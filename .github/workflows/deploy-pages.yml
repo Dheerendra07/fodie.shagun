@@ -17,52 +17,31 @@ concurrency:
 
 jobs:
   deploy:
-    runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: \${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
     steps:
       - name: Check out repository
-        uses: actions/checkout@v6
+        uses: actions/checkout@v4
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
-        with:
-          enablement: true
 
       - name: Prepare static website
         shell: bash
         run: |
           set -euo pipefail
-          mkdir -p _site
-          cp index.html FoodieHub_Logo_Dark.svg FoodieHub_Logo_Light.svg FoodieHub_Logo_Icon.svg _site/
-          cp foodiehub-ui-refinement.css _site/
-          cp .nojekyll _site/.nojekyll
-          python - <<'PY'
-          from pathlib import Path
-          import re
-
-          page = Path("_site/index.html")
-          html = page.read_text(encoding="utf-8")
-          link = '<link rel="stylesheet" href="foodiehub-ui-refinement.css?v=2">'
-
-          linked = re.search(
-              r'<link\b[^>]*href=["\'](?:\./)?foodiehub-ui-refinement\.css(?:\?[^"\']*)?["\']',
-              html,
-              flags=re.IGNORECASE,
-          )
-          if not linked:
-              if not re.search(r'</head\s*>', html, flags=re.IGNORECASE):
-                  raise SystemExit("Could not find </head> in index.html")
-              html = re.sub(r'</head\s*>', '  ' + link + '\n</head>', html, count=1, flags=re.IGNORECASE)
-
-          if not re.search(r'href=["\'](?:\./)?foodiehub-ui-refinement\.css(?:\?[^"\']*)?["\']', html, flags=re.IGNORECASE):
-              raise SystemExit("Stylesheet link injection failed")
-          page.write_text(html, encoding="utf-8")
-          PY
+          mkdir -p _site/assets _site/data
+          cp index.html _site/
+          cp FoodieHub_Logo_Dark.svg FoodieHub_Logo_Light.svg FoodieHub_Logo_Icon.svg _site/
+          cp -R assets/css assets/js _site/assets/
+          cp data/menu.json _site/data/
+          touch _site/.nojekyll
           test -s _site/index.html
-          test -s _site/foodiehub-ui-refinement.css
-          grep -qi 'foodiehub-ui-refinement.css' _site/index.html
+          test -s _site/assets/css/styles.css
+          test -s _site/assets/js/app.js
+          test -s _site/data/menu.json
 
       - name: Upload website artifact
         uses: actions/upload-pages-artifact@v4
