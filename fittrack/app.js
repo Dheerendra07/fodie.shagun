@@ -28,6 +28,10 @@ data.setsCompleted = data.setsCompleted || {};
 for (const name of data.completed || []) {
   if (!data.setsCompleted[name]) data.setsCompleted[name] = [true,true,true,true,true];
 }
+data.completed = (data.completed || []).filter(name => workouts.some(w => w.name === name));
+for (const name of Object.keys(data.setsCompleted)) {
+  if (!workouts.some(w => w.name === name)) delete data.setsCompleted[name];
+}
 const viewNames = {overview:"Overview",workouts:"Workouts",nutrition:"Nutrition",hydration:"Hydration",progress:"Progress"};
 function save(){localStorage.setItem(KEY,JSON.stringify(data));}
 function notify(message){const el=$("#toast");el.textContent=message;el.classList.add("show");clearTimeout(toastTimer);toastTimer=setTimeout(()=>el.classList.remove("show"),2300);}
