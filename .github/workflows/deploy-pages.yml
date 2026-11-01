@@ -40,7 +40,7 @@ jobs:
           from pathlib import Path
           page = Path("_site/index.html")
           html = page.read_text(encoding="utf-8")
-          stylesheet = '  <link rel="stylesheet" href="foodiehub-ui-refinement.css">\\n'
+          stylesheet = '  <link rel="stylesheet" href="foodiehub-ui-refinement.css">\n'
           if "foodiehub-ui-refinement.css" not in html:
               if "</head>" not in html:
                   raise SystemExit("Could not find </head> in index.html")
