@@ -2039,3 +2039,98 @@ h1 em,h2 em {
   .my-order-status{font-size:8px;padding:0 7px}
   .my-order-top,.my-order-bottom{gap:8px}
 }
+
+/* Interactive home refinements: customise shortcut, offer carousel, greeting and tracking. */
+.hero-note-action{position:relative;padding:0;border:0;background:transparent;color:inherit;text-align:left;cursor:pointer;border-radius:999px;transition:transform .2s ease,opacity .2s ease}
+.hero-note-action:hover{transform:translateY(-2px)}
+.hero-note-action:focus-visible{outline:2px solid var(--orange);outline-offset:6px}
+.hero-note-arrow{margin-left:3px;color:var(--orange-dark);font-size:13px;font-weight:900;opacity:0;transform:translateX(-4px);transition:opacity .2s,transform .2s}
+.hero-note-action:hover .hero-note-arrow,.hero-note-action:focus-visible .hero-note-arrow{opacity:1;transform:translateX(0)}
+.offer-carousel-track{display:grid;align-items:stretch}
+.offer-slide{grid-area:1 / 1;min-width:0;opacity:0;visibility:hidden;pointer-events:none;transform:translateY(12px) scale(.995);transition:opacity .42s ease,transform .42s ease,visibility 0s linear .42s}
+.offer-slide.is-active{z-index:1;opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0) scale(1);transition-delay:0s}
+.offer-slide[data-offer-slide="1"]{background:radial-gradient(circle at 83% 15%,rgba(255,218,180,.18),transparent 18rem),linear-gradient(118deg,#412c26,#7c4e3b 58%,#49302b)}
+.offer-slide[data-offer-slide="2"]{background:radial-gradient(circle at 84% 13%,rgba(220,231,170,.17),transparent 18rem),linear-gradient(118deg,#24362c,#52634b 58%,#283d30)}
+.offer-slide[data-offer-slide="3"]{background:radial-gradient(circle at 82% 14%,rgba(197,220,211,.19),transparent 18rem),linear-gradient(118deg,#1d3541,#365e67 58%,#263e4c)}
+.offer-art-free>strong{font-size:clamp(49px,6vw,68px);letter-spacing:-.08em}
+.offer-art-free .offer-code{font-size:10px}
+.offer-slider-controls{display:flex;align-items:center;justify-content:center;gap:13px;margin:14px auto 0}
+.offer-nav{display:grid;width:34px;height:34px;place-items:center;border:1px solid var(--glass-border);border-radius:50%;background:var(--glass);color:var(--ink);font-size:16px;cursor:pointer;transition:transform .2s,border-color .2s,background .2s}
+.offer-nav:hover{transform:translateY(-2px);border-color:var(--orange);background:var(--glass-strong)}
+.offer-dots{display:flex;align-items:center;gap:5px;padding:4px;border:1px solid var(--glass-border);border-radius:99px;background:var(--glass)}
+.offer-dots button{min-width:29px;height:25px;padding:0 7px;border:0;border-radius:99px;background:transparent;color:var(--muted);font:800 9px var(--sans);cursor:pointer;transition:background .2s,color .2s}
+.offer-dots button[aria-pressed="true"]{background:var(--green-soft);color:var(--green)}
+.offer-slide-count{min-width:51px;color:var(--muted);font-size:9px;font-weight:800;text-align:center}
+.offer-slide-count i{padding:0 3px;color:var(--orange);font-style:normal}
+.welcome-intro[hidden]{display:none!important}
+.welcome-intro{position:fixed;inset:0;z-index:1400;display:grid;place-items:center;overflow:hidden;padding:24px;background:rgba(12,20,15,.86);-webkit-backdrop-filter:blur(20px) saturate(125%);backdrop-filter:blur(20px) saturate(125%);opacity:1;transition:opacity .35s ease,visibility .35s ease}
+.welcome-intro.is-leaving{opacity:0;visibility:hidden;pointer-events:none}
+body.welcome-open{overflow:hidden}
+.welcome-card{position:relative;z-index:1;width:min(470px,100%);padding:43px 35px 28px;border:1px solid rgba(255,255,255,.21);border-radius:28px;background:linear-gradient(145deg,rgba(255,255,255,.15),rgba(255,255,255,.055));box-shadow:0 35px 110px rgba(0,0,0,.34),inset 0 1px 0 rgba(255,255,255,.2);text-align:center;color:#fffdf7;animation:welcome-card-in .65s cubic-bezier(.2,.8,.2,1) both}
+.welcome-mark{display:grid;width:58px;height:58px;place-items:center;margin:0 auto 20px;border:1px solid rgba(242,206,158,.58);border-radius:19px;background:rgba(242,206,158,.12);color:#f2ce9e;font-size:28px;box-shadow:0 0 42px rgba(242,206,158,.2);animation:welcome-mark-glow 1.8s ease-in-out infinite alternate}
+.welcome-kicker{color:#f2ce9e;font-size:9px;font-weight:900;letter-spacing:.2em}
+.welcome-card h2{margin:13px 0 9px;font-family:var(--serif,"DM Serif Display",serif);font-size:clamp(34px,7vw,47px);font-weight:500;letter-spacing:-.045em;line-height:1.08}
+.welcome-card h2 em{color:#f2ce9e;font-weight:400}
+.welcome-card p{max-width:340px;margin:0 auto 22px;color:rgba(255,253,247,.78);font-size:12px;line-height:1.7}
+.welcome-card>button{min-height:42px;padding:0 17px;border:1px solid rgba(255,255,255,.22);border-radius:999px;background:#f2ce9e;color:#27352a;font:850 11px var(--sans);cursor:pointer;transition:transform .2s,filter .2s}
+.welcome-card>button:hover{transform:translateY(-2px);filter:brightness(1.05)}
+.welcome-progress{height:3px;margin-top:28px;overflow:hidden;border-radius:99px;background:rgba(255,255,255,.15)}
+.welcome-progress span{display:block;width:0;height:100%;border-radius:inherit;background:#f2ce9e;animation:welcome-progress-fill 2.6s linear forwards}
+.welcome-glow{position:absolute;width:360px;height:360px;border-radius:50%;filter:blur(42px);opacity:.17;pointer-events:none}
+.welcome-glow-one{top:-155px;left:-100px;background:#b5c78d}
+.welcome-glow-two{right:-130px;bottom:-180px;background:#d79a68}
+@keyframes welcome-card-in{from{opacity:0;transform:translateY(20px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes welcome-mark-glow{from{transform:rotate(-7deg) scale(.97)}to{transform:rotate(7deg) scale(1.04)}}
+@keyframes welcome-progress-fill{to{width:100%}}
+.tracking-intro{margin:-2px 0 14px;padding:12px 14px;border:1px solid var(--glass-border);border-radius:12px;background:var(--glass-soft)}
+.tracking-intro p{margin:0;color:var(--muted);font-size:11px;line-height:1.6}
+.tracking-recent-wrap{display:grid;gap:6px;margin:0 0 2px;padding:12px;border:1px solid var(--glass-border);border-radius:13px;background:var(--green-soft)}
+.tracking-recent-wrap[hidden]{display:none!important}
+.tracking-recent-wrap .form-field{gap:6px}
+.tracking-recent-wrap select{width:100%;min-height:43px;padding:10px 12px;border:1px solid var(--glass-border);border-radius:11px;background:var(--glass-strong);color:var(--ink);font:600 12px var(--sans)}
+.tracking-recent-wrap>small,.tracking-helper{color:var(--muted);font-size:10px;line-height:1.5}
+.tracking-helper{margin:0}
+.footer-team-access{max-width:184px;min-height:41px;gap:7px;margin:3px 0 9px!important;padding:6px 8px!important;border-radius:11px!important;box-shadow:none}
+.footer-team-access:hover{transform:translateY(-1px);box-shadow:0 6px 15px rgba(25,35,27,.055)}
+.footer-team-icon{flex-basis:26px;width:26px;height:26px;border-radius:8px;font-size:13px}
+.footer-team-copy{gap:2px}
+.footer-team-copy strong{font-size:9px}
+.footer-team-copy small{font-size:7.5px}
+.footer-team-arrow{font-size:12px}
+@media(max-width:760px){
+ .offer-panel{gap:10px}
+ .offer-slider-controls{gap:8px;margin-top:11px}
+ .offer-nav{width:31px;height:31px}
+ .offer-dots button{min-width:26px;height:23px;font-size:8px}
+ .welcome-card{padding:35px 23px 24px;border-radius:23px}
+}
+@media(max-width:520px){
+ .hero-note-action{gap:6px}
+ .hero-note-arrow{opacity:1;transform:none}
+ .offer-panel{align-items:center}
+ .offer-copy{max-width:63%}
+ .offer-art{width:126px;height:126px;flex:0 0 126px}
+ .offer-art>strong{font-size:52px}
+ .offer-art>strong span{font-size:22px}
+ .offer-code{font-size:7px}
+ .offer-art-free>strong{font-size:38px}
+ .offer-art-free .offer-code{font-size:6px}
+ .offer-slider-controls{gap:6px}
+ .offer-slide-count{min-width:42px;font-size:8px}
+ .offer-dots{gap:2px}
+ .offer-dots button{min-width:23px;padding:0 5px}
+ .footer-team-access{max-width:175px}
+}
+@media(max-width:390px){
+ .offer-panel{padding:22px 13px}
+ .offer-copy{max-width:62%}
+ .offer-copy h2{font-size:29px}
+ .offer-copy p{font-size:11px;line-height:1.5}
+ .offer-art{width:109px;height:109px;flex-basis:109px}
+ .offer-art>strong{font-size:43px}
+ .offer-art>strong span{font-size:18px}
+ .offer-art-free>strong{font-size:32px}
+}
+@media(prefers-reduced-motion:reduce){
+ .offer-slide,.offer-slide.is-active,.welcome-intro,.welcome-card,.welcome-mark,.welcome-progress span{transition:none!important;animation:none!important}
+}

@@ -833,11 +833,31 @@
     }
   }
 
-  function openTracking() {
+  function openTracking(preselectedOrderNumber="") {
     closeCart();
-    $("#trackingForm").reset();
-    $("#trackingError").textContent = "";
-    $("#trackingResult").hidden = true;
+    const form=$("#trackingForm");
+    form.reset();
+    $("#trackingError").textContent="";
+    $("#trackingResult").hidden=true;
+    const phone=String(state.profile.phone||"").replace(/\\D/g,"").slice(-10);
+    form.elements.namedItem("phone").value=phone;
+    $("#trackingHelper").textContent=phone
+      ?"Mobile number filled from your profile. Check that it matches the number used when placing the order."
+      :"Save your checkout mobile in Profile, or enter it below to verify your order.";
+    const matches=phone?state.orders.filter(order=>String(order.phone||(order.customer&&order.customer.phone)||"").replace(/\\D/g,"").slice(-10)===phone).slice().sort((a,b)=>new Date(b.createdAt||b.created_at||0)-new Date(a.createdAt||a.created_at||0)).slice(0,6):[];
+    const select=$("#trackingRecentSelect");
+    select.innerHTML='<option value="">Choose an order (optional)</option>'+matches.map(order=>{
+      const number=String(order.orderNumber||order.order_number||"");
+      const date=customerOrderDate(order);
+      return '<option value="'+escapeHTML(number)+'">'+escapeHTML(number+' · '+date+' · '+money(order.total||0))+'</option>';
+    }).join("");
+    $("#trackingRecentWrap").hidden=!matches.length;
+    if(preselectedOrderNumber){
+      form.elements.namedItem("orderNumber").value=preselectedOrderNumber;
+      select.value=preselectedOrderNumber;
+    }else if(matches.length){
+      $("#trackingHelper").textContent="Choose one of your recent orders above, or enter the order number from your confirmation.";
+    }
     openDialog("trackingDialog");
   }
 
@@ -1139,6 +1159,107 @@
     if(track){const orderNumber=track.dataset.trackMyOrder;closeDialog("myDashboardDialog");openTracking();$("#trackingForm").elements.namedItem("orderNumber").value=orderNumber;$("#trackingForm").elements.namedItem("phone").value=String(state.profile.phone||"");}
   }
 
+
+  let offerSlideIndex=0;
+  let offerRotationTimer=null;
+  function renderOfferSlide(index,announce=false){
+    const slides=$("#offerCarousel [data-offer-slide]");
+    if(!slides.length)return;
+    offerSlideIndex=(index+slides.length)%slides.length;
+    slides.forEach((slide,i)=>{
+      const active=i===offerSlideIndex;
+      slide.classList.toggle("is-active",active);
+      slide.setAttribute("aria-hidden",String(!active));
+    });
+    $("#offerCarousel [data-offer-dot]").forEach(button=>{
+      button.setAttribute("aria-pressed",String(Number(button.dataset.offerDot)===offerSlideIndex));
+    });
+    $("#offerSlideCount").innerHTML=String(offerSlideIndex+1).padStart(2,"0")+' <i>/</i> '+String(slides.length).padStart(2,"0");
+    if(announce)$("#offerAnnouncement").textContent="Offer "+(offerSlideIndex+1)+" of "+slides.length+" is now shown.";
+  }
+  function pauseOfferRotation(){
+    if(offerRotationTimer){window.clearInterval(offerRotationTimer);offerRotationTimer=null;}
+  }
+  function resumeOfferRotation(){
+    pauseOfferRotation();
+    const reduced=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if(reduced||document.hidden)return;
+    offerRotationTimer=window.setInterval(()=>renderOfferSlide(offerSlideIndex+1),4800);
+  }
+  function applyOfferCode(code){
+    const offers={
+      HUB50:{code:"HUB50",percent:50,maximum:200,minimum:699},
+      FOOD25:{code:"FOOD25",percent:25,maximum:100,minimum:299},
+      COMBO10:{code:"COMBO10",percent:10,maximum:150,minimum:199}
+    };
+    const offer=offers[code];
+    if(!offer)return;
+    state.coupon=offer;
+    state.pendingRewardRedemption=false;
+    $("#couponInput").value=code;
+    const subtotal=calculateBill().subtotal;
+    $("#couponMessage").textContent=subtotal>=offer.minimum
+      ?code+" applied. Your discount is ready."
+      :" "+code+" saved. Add "+money(offer.minimum-subtotal)+" more to unlock this offer.";
+    $("#couponMessage").className=subtotal>=offer.minimum?"coupon-message message-success":"coupon-message message-warning";
+    renderCart();
+    $("#menu").scrollIntoView({behavior:"smooth",block:"start"});
+    showToast(code+" saved to your bag. Add eligible dishes to unlock the discount.");
+  }
+  function initOfferCarousel(){
+    const carousel=$("#offerCarousel");
+    if(!carousel)return;
+    renderOfferSlide(0);
+    $("#offerPrevious").addEventListener("click",()=>{renderOfferSlide(offerSlideIndex-1,true);resumeOfferRotation();});
+    $("#offerNext").addEventListener("click",()=>{renderOfferSlide(offerSlideIndex+1,true);resumeOfferRotation();});
+    $("#offerCarousel [data-offer-dot]").forEach(button=>button.addEventListener("click",()=>{
+      renderOfferSlide(Number(button.dataset.offerDot),true);resumeOfferRotation();
+    }));
+    $("#offerCarousel [data-use-offer]").forEach(button=>button.addEventListener("click",()=>{
+      applyOfferCode(button.dataset.useOffer);
+    }));
+    $("#offerCarousel [data-shop-offer]").forEach(button=>button.addEventListener("click",()=>{
+      $("#menu").scrollIntoView({behavior:"smooth",block:"start"});
+      showToast("Free delivery is automatically applied on orders of ₹499 or more.");
+    }));
+    carousel.addEventListener("mouseenter",pauseOfferRotation);
+    carousel.addEventListener("mouseleave",resumeOfferRotation);
+    carousel.addEventListener("focusin",pauseOfferRotation);
+    carousel.addEventListener("focusout",()=>window.setTimeout(()=>{
+      if(!carousel.contains(document.activeElement))resumeOfferRotation();
+    },120));
+    document.addEventListener("visibilitychange",()=>document.hidden?pauseOfferRotation():resumeOfferRotation());
+    resumeOfferRotation();
+  }
+  function showWelcomeIntro(){
+    const overlay=$("#welcomeIntro");
+    if(!overlay)return;
+    try{
+      if(sessionStorage.getItem("foodiehub.welcome.seen")==="1")return;
+      sessionStorage.setItem("foodiehub.welcome.seen","1");
+    }catch(_){}
+    overlay.hidden=false;
+    overlay.setAttribute("aria-hidden","false");
+    document.body.classList.add("welcome-open");
+    let finished=false;
+    let timer=null;
+    const hide=()=>{
+      if(finished)return;
+      finished=true;
+      if(timer)window.clearTimeout(timer);
+      overlay.classList.add("is-leaving");
+      document.body.classList.remove("welcome-open");
+      window.setTimeout(()=>{
+        overlay.hidden=true;
+        overlay.setAttribute("aria-hidden","true");
+        overlay.classList.remove("is-leaving");
+      },360);
+    };
+    $("#skipWelcome").addEventListener("click",hide,{once:true});
+    const reduced=window.matchMedia&&window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    timer=window.setTimeout(hide,reduced?1200:2600);
+  }
+
   function openTeamDashboard(){
     $("#adminError").textContent="";
     if(state.backendOnline){
@@ -1215,8 +1336,22 @@
       }
     });
     $("#trackingForm").addEventListener("submit", trackOrder);
-    $("#trackOrderLink").addEventListener("click", openTracking);
+    $("#trackingRecentSelect").addEventListener("change",event=>{
+      const selected=event.currentTarget.value;
+      if(!selected)return;
+      $("#trackingForm").elements.namedItem("orderNumber").value=selected;
+      $("#trackingForm").elements.namedItem("phone").value=String(state.profile.phone||"");
+      $("#trackingError").textContent="";
+    });
     $("#trackOrderHome").addEventListener("click", openTracking);
+    $("#customisePlateShortcut").addEventListener("click",()=>{
+      $("#menu").scrollIntoView({behavior:"smooth",block:"start"});
+      window.setTimeout(()=>{
+        const firstCustomize=$("#menuGrid [data-customize]")[0];
+        if(firstCustomize)firstCustomize.focus({preventScroll:true});
+      },450);
+      showToast("Choose a dish, then select View details & customise to build your plate.");
+    });
     $("#openMyDashboard").addEventListener("click", openMyDashboard);
     $("#myDashboardEditProfile").addEventListener("click",()=>{closeDialog("myDashboardDialog");openProfile();});
     $("#myOrdersList").addEventListener("click",handleMyDashboardAction);
@@ -1276,6 +1411,8 @@
     setTheme(savedTheme || systemTheme);
     $("#currentYear").textContent = new Date().getFullYear();
     bindEvents();
+    initOfferCarousel();
+    showWelcomeIntro();
     renderProfile();
     renderCart();
     const heroImage=$(".hero-image-frame img");
