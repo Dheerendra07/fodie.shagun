@@ -1,4 +1,4 @@
-@import url("https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Playfair+Display:ital,wght@0,600;0,700;1,600;1,700&display=swap");
+@import url("https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=Manrope:wght@400;500;600;700;800&display=swap");
 
 :root {
   color-scheme: light;
@@ -14,8 +14,8 @@
   --green: #50684d;
   --green-soft: #e5eadf;
   --shadow: 0 22px 60px rgba(55, 39, 22, .09);
-  --display: "Playfair Display", Georgia, serif;
-  --sans: "DM Sans", Arial, sans-serif;
+  --display: "DM Serif Display", Georgia, serif;
+  --sans: "Manrope", Arial, sans-serif;
   --radius: 22px;
 }
 :root[data-theme="dark"] {
@@ -426,4 +426,87 @@ h1 em, h2 em { color: var(--orange); font-family: var(--display); font-weight: 6
 }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}
+
+/* FoodieHub account, address-book and add-to-cart refinements */
+.profile-trigger {
+  min-height: 42px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 13px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--card);
+  color: var(--ink);
+  font-size: 11px;
+  font-weight: 800;
+  transition: transform .2s, border-color .2s, background .2s;
+}
+.profile-trigger:hover { transform: translateY(-2px); border-color: var(--orange); }
+.profile-trigger:focus-visible, .add-button:focus-visible { outline: 3px solid color-mix(in srgb, var(--orange) 35%, transparent); outline-offset: 3px; }
+.profile-icon {
+  width: 23px;
+  height: 23px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--orange-soft);
+  color: var(--orange-dark);
+  font-size: 15px;
+}
+.profile-trigger-label { max-width: 104px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-dialog { width: min(610px, calc(100% - 28px)); }
+.profile-form { padding-top: 20px; }
+.profile-intro { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--paper); }
+.profile-avatar { width: 42px; height: 42px; display: grid; place-items: center; flex: 0 0 42px; border-radius: 50%; background: var(--orange-soft); color: var(--orange-dark); font-size: 22px; }
+.profile-intro strong, .profile-intro small { display: block; }
+.profile-intro strong { color: var(--ink); font-size: 12px; }
+.profile-intro small { margin-top: 3px; color: var(--muted); font-size: 9px; }
+.address-intro { margin-top: 24px; }
+.profile-form > .form-field textarea { min-height: 88px; }
+.profile-storage-note { display: flex; align-items: flex-start; gap: 8px; margin: 13px 0 4px; color: var(--muted); font-size: 9px; line-height: 1.6; }
+.profile-storage-note span { color: var(--orange-dark); font-size: 14px; }
+.profile-save-button { width: 100%; margin-top: 9px; }
+.profile-message { min-height: 15px; margin: 8px 0 0; color: var(--green); font-size: 9px; text-align: center; }
+.save-profile-choice { display: flex; align-items: center; gap: 10px; margin: 17px 0 2px; padding: 12px 13px; border: 1px solid var(--line); border-radius: 11px; background: var(--paper); cursor: pointer; }
+.save-profile-choice input { width: 16px; height: 16px; accent-color: var(--orange); }
+.save-profile-choice strong, .save-profile-choice small { display: block; }
+.save-profile-choice strong { color: var(--ink); font-size: 10px; }
+.save-profile-choice small { margin-top: 2px; color: var(--muted); font-size: 8px; }
+.add-button.is-added { border-color: var(--green); background: var(--green-soft); color: var(--green); transform: scale(.96); }
+.cart-trigger.cart-bump { animation: cart-bump .48s cubic-bezier(.2,.8,.25,1); }
+.cart-count.count-pop { animation: count-pop .42s ease-out; }
+.cart-flight {
+  position: fixed;
+  z-index: 120;
+  width: 56px;
+  height: 56px;
+  border: 2px solid var(--card);
+  border-radius: 14px;
+  object-fit: cover;
+  box-shadow: 0 12px 32px rgba(0,0,0,.22);
+  pointer-events: none;
+  will-change: transform, opacity;
+}
+@keyframes cart-bump {
+  0%, 100% { transform: scale(1); }
+  35% { transform: scale(1.12) rotate(-3deg); }
+  68% { transform: scale(.96) rotate(2deg); }
+}
+@keyframes count-pop {
+  0% { transform: scale(1); }
+  45% { transform: scale(1.38); background: var(--green); }
+  100% { transform: scale(1); }
+}
+:root[data-theme="dark"] .profile-trigger { background: var(--card); color: var(--ink); }
+:root[data-theme="dark"] .profile-intro { background: var(--paper-deep); }
+@media (max-width: 760px) {
+  .profile-trigger { width: 37px; min-height: 37px; padding: 0; }
+  .profile-trigger-label { display: none; }
+  .profile-dialog .dialog-header, .profile-form { padding-right: 18px; padding-left: 18px; }
+}
+@media (max-width: 390px) {
+  .profile-dialog .dialog-header, .profile-form { padding-right: 16px; padding-left: 16px; }
 }
