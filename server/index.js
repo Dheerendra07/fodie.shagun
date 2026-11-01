@@ -104,9 +104,16 @@ function calculateCustomization(product, input) {
     error.status = 400;
     throw error;
   }
-
   let allowedExtras;
-  if (["burgers", "pizza", "sides"].includes(category)) {
+  if (category === "pizza") {
+    allowedExtras = [
+      { name: "Extra cheese", price: 35 },
+      { name: product.isVeg ? "Extra paneer" : "Extra chicken", price: product.isVeg ? 49 : 59 },
+      { name: "Jalapeños", price: 20 },
+      { name: "Black olives", price: 25 },
+      { name: "Chilli flakes", price: 0 }
+    ];
+  } else if (category === "burgers") {
     allowedExtras = [
       { name: "Extra cheese", price: 29 },
       { name: product.isVeg ? "Extra paneer patty" : "Extra chicken patty", price: product.isVeg ? 49 : 69 },
@@ -121,13 +128,24 @@ function calculateCustomization(product, input) {
       { name: "Garlic bread", price: 49 }
     ];
   } else if (category === "desserts") {
-    allowedExtras = [{ name: "Ice cream scoop", price: 39 }, { name: "Whipped cream", price: 19 }, { name: "Chocolate drizzle", price: 20 }];
+    allowedExtras = [
+      { name: "Ice cream scoop", price: 39 },
+      { name: "Whipped cream", price: 19 },
+      { name: "Chocolate drizzle", price: 20 }
+    ];
   } else if (category === "drinks") {
-    allowedExtras = [{ name: "Extra espresso shot", price: 35 }, { name: "Whipped cream", price: 19 }, { name: "Vanilla scoop", price: 29 }];
+    allowedExtras = [
+      { name: "Extra espresso shot", price: 35 },
+      { name: "Whipped cream", price: 19 },
+      { name: "Vanilla scoop", price: 29 }
+    ];
   } else {
-    allowedExtras = [{ name: "Signature dip", price: 20 }, { name: "Extra cheese", price: 25 }, { name: "Make it loaded", price: 35 }];
+    allowedExtras = [
+      { name: "Signature dip", price: 20 },
+      { name: "Extra cheese", price: 25 },
+      { name: "Make it loaded", price: 35 }
+    ];
   }
-
   const requestedExtras = Array.isArray(data.extras) ? data.extras : [];
   if (requestedExtras.length > 8) {
     const error = new Error("Too many add-ons were selected.");
@@ -155,7 +173,6 @@ function calculateCustomization(product, input) {
     unitPrice: round(product.price + sizeExtra + extras.reduce((sum, extra) => sum + extra.price, 0))
   };
 }
-
 function calculateOrder(items, couponCode) {
   if (!Array.isArray(items) || items.length < 1 || items.length > 30) {
     const error = new Error("Add at least one menu item before placing an order.");

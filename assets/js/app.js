@@ -520,10 +520,10 @@
           '</div><strong class="cart-line-total">' + money(item.price * item.quantity) + '</strong>' +
         '</article>'
       )).join("");
-      $("[data-quantity]", container).forEach(button => {
+      $$("[data-quantity]", container).forEach(button => {
         button.addEventListener("click", () => changeQuantity(button.dataset.quantity, Number(button.dataset.change)));
       });
-      $(".cart-line img[data-food-id]",container).forEach(image=>{
+      $$(".cart-line img[data-food-id]",container).forEach(image=>{
         const dish=state.menu.find(product=>product.id===image.dataset.foodId);
         if(dish)protectFoodPhoto(image,dish);
       });
