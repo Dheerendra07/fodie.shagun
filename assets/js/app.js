@@ -63,6 +63,8 @@
     pendingRewardRedemption: false,
     adminKey: "",
     adminOrders: [],
+    adminAnalytics: null,
+    adminChartView: "month",
     adminSource: "none",
     paymentGateway: { enabled: false, keyId: "" }
   };
@@ -611,7 +613,7 @@
 
   function saveLocalOrder(order) {
     state.orders.unshift(order);
-    saveStore(STORAGE.orders, state.orders.slice(0, 20));
+    saveStore(STORAGE.orders, state.orders);
   }
 
   function finalizeOrder(order, customer, payload, paymentMode) {
@@ -921,11 +923,65 @@
     $("#couponMessage").className="coupon-message message-success";renderCart();showToast("Reward unlocked. Complete checkout to use it!");
   }
   function normalizeAdminStatus(status){return status==="demo_saved"?"confirmed":(status||"confirmed");}
+  function formatAdminDateKey(date){return date.getFullYear()+"-"+String(date.getMonth()+1).padStart(2,"0")+"-"+String(date.getDate()).padStart(2,"0");}
+  function buildDemoAdminAnalytics(orders){
+    const months=new Map(),weeks=new Map();let grossSales=0,deliveredOrders=0,cancelledOrders=0;
+    (orders||[]).forEach(order=>{
+      const date=new Date(order.created_at||order.createdAt||"");
+      const total=Math.max(0,Number(order.total||0));grossSales+=total;
+      if(String(order.status||"").toLowerCase()==="delivered")deliveredOrders++;
+      if(String(order.status||"").toLowerCase()==="cancelled")cancelledOrders++;
+      if(Number.isNaN(date.getTime()))return;
+      const monthKey=date.getFullYear()+"-"+String(date.getMonth()+1).padStart(2,"0");
+      const monday=new Date(date.getFullYear(),date.getMonth(),date.getDate());monday.setDate(monday.getDate()-((monday.getDay()+6)%7));
+      const weekKey=formatAdminDateKey(monday);
+      [[months,monthKey],[weeks,weekKey]].forEach(([map,key])=>{if(!map.has(key))map.set(key,{bucket:key,orders:0,revenue:0});const item=map.get(key);item.orders++;item.revenue+=total;});
+    });
+    const monthly=Array.from(months.values()).sort((a,b)=>a.bucket.localeCompare(b.bucket));
+    const weekly=Array.from(weeks.values()).sort((a,b)=>a.bucket.localeCompare(b.bucket));
+    const totalOrders=(orders||[]).length;
+    return {summary:{totalOrders,grossSales,averageOrder:totalOrders?grossSales/totalOrders:0,deliveredOrders,cancelledOrders,activeMonths:monthly.length,activeWeeks:weekly.length,averagePerActiveMonth:monthly.length?totalOrders/monthly.length:0,averagePerActiveWeek:weekly.length?totalOrders/weekly.length:0},monthly,weekly,timezone:"browser local time"};
+  }
+  function getAdminRollingBuckets(analytics,view){
+    const now=new Date(),lookup=new Map(),source=view==="week"?(analytics.weekly||[]):(analytics.monthly||[]);
+    source.forEach(item=>lookup.set(String(item.bucket||item.period||""),item));
+    const buckets=[];
+    if(view==="week"){
+      const monday=new Date(now.getFullYear(),now.getMonth(),now.getDate());monday.setDate(monday.getDate()-((monday.getDay()+6)%7));
+      for(let i=11;i>=0;i--){const start=new Date(monday);start.setDate(start.getDate()-i*7);const key=formatAdminDateKey(start),item=lookup.get(key)||{};buckets.push({key,label:start.toLocaleDateString("en-IN",{day:"numeric",month:"short"}),subLabel:"W"+(12-i),orders:Number(item.orders||item.order_count||0),revenue:Number(item.revenue||0)});}
+    }else{
+      for(let i=11;i>=0;i--){const date=new Date(now.getFullYear(),now.getMonth()-i,1);const key=date.getFullYear()+"-"+String(date.getMonth()+1).padStart(2,"0"),item=lookup.get(key)||{};buckets.push({key,label:date.toLocaleDateString("en-IN",{month:"short"}),subLabel:String(date.getFullYear()),orders:Number(item.orders||item.order_count||0),revenue:Number(item.revenue||0)});}
+    }
+    return buckets;
+  }
+  function renderAdminAnalytics(){
+    const analytics=state.adminAnalytics||buildDemoAdminAnalytics(state.adminOrders||[]),summary=analytics.summary||{},view=state.adminChartView||"month";
+    const buckets=getAdminRollingBuckets(analytics,view),maxOrders=Math.max(1,...buckets.map(item=>item.orders)),current=buckets[buckets.length-1]||{orders:0,revenue:0};
+    const peak=buckets.reduce((best,item)=>item.orders>best.orders?item:best,{orders:0});
+    $("#adminMonthlyAverage").textContent=Number(summary.averagePerActiveMonth||0).toLocaleString("en-IN",{maximumFractionDigits:1});
+    $("#adminCurrentPeriodLabel").textContent=view==="week"?"THIS WEEK":"THIS MONTH";
+    $("#adminCurrentPeriodOrders").textContent=current.orders.toLocaleString("en-IN")+" "+(current.orders===1?"order":"orders");
+    $("#adminCurrentPeriodRevenue").textContent=money(current.revenue)+" recorded revenue";
+    $("#adminChartTitle").textContent=view==="week"?"Orders per week":"Orders per month";
+    $("#adminChartRange").textContent=view==="week"?"Last 12 weeks":"Last 12 months";
+    $("#adminTimezoneNote").textContent=analytics.timezone==="Asia/Kolkata"?"Dates shown in India time":"Dates shown in browser local time";
+    $("#adminPeakPeriod").textContent=peak.orders?(view==="week"?"Week of ":"")+peak.label+(view==="month"?" "+peak.subLabel:""):"—";
+    $("#adminPeakOrders").textContent=peak.orders?peak.orders.toLocaleString("en-IN")+" orders in this period":"No orders in the periods shown";
+    $$(".admin-chart-switch [data-analytics-view]").forEach(button=>button.setAttribute("aria-pressed",String(button.dataset.analyticsView===view)));
+    $("#adminAnalyticsChart").innerHTML='<div class="admin-chart-columns">'+buckets.map(item=>{
+      const height=item.orders?Math.max(5,Math.round(item.orders/maxOrders*100)):2;
+      const title=item.orders+" orders · "+money(item.revenue)+" revenue";
+      return '<div class="admin-chart-column" title="'+escapeHTML(title)+'"><strong>'+item.orders.toLocaleString("en-IN")+'</strong><div class="admin-chart-bar-track"><span style="height:'+height+'%"></span></div><small>'+escapeHTML(item.label)+'</small><em>'+escapeHTML(item.subLabel)+'</em></div>';
+    }).join("")+'</div>';
+  }
   function renderAdminDashboard(){
-    const orders=state.adminOrders||[],revenue=orders.reduce((sum,order)=>sum+Number(order.total||0),0);
-    $("#adminOrderCount").textContent=orders.length.toLocaleString("en-IN");$("#adminRevenue").textContent=money(revenue);
-    $("#adminAverage").textContent=orders.length?money(revenue/orders.length):money(0);
-    $("#adminSourceLabel").textContent=state.adminSource==="live"?"LIVE BACKEND":"LOCAL DEMO";
+    const orders=state.adminOrders||[],analytics=state.adminAnalytics||buildDemoAdminAnalytics(orders),summary=analytics.summary||{};
+    const totalOrders=Number(summary.totalOrders==null?orders.length:summary.totalOrders),revenue=Number(summary.grossSales==null?orders.reduce((sum,order)=>sum+Number(order.total||0),0):summary.grossSales);
+    $("#adminOrderCount").textContent=totalOrders.toLocaleString("en-IN");$("#adminRevenue").textContent=money(revenue);
+    $("#adminAverage").textContent=money(summary.averageOrder==null?(totalOrders?revenue/totalOrders:0):summary.averageOrder);
+    $("#adminWeeklyAverage").textContent=Number(summary.averagePerActiveWeek||0).toLocaleString("en-IN",{maximumFractionDigits:1});
+    $("#adminSourceLabel").textContent=state.adminSource==="live"?"LIVE DATABASE":"THIS DEVICE";
+    renderAdminAnalytics();
     if(!orders.length){$("#adminOrdersBody").innerHTML='<tr><td colspan="5">No orders yet.</td></tr>';return;}
     $("#adminOrdersBody").innerHTML=orders.map(order=>{
       const number=order.order_number||order.orderNumber||"FH-UNKNOWN",name=order.customer_name||(order.customer&&order.customer.name)||"Demo customer",status=normalizeAdminStatus(order.status);
@@ -938,15 +994,18 @@
     if(state.backendOnline){
       if(!key){$("#adminError").textContent="Enter the server admin key to continue.";return;}
       try{
-        const result=await request("/api/admin/orders",{headers:{Authorization:"Bearer "+key}});
-        state.adminKey=key;state.adminSource="live";state.adminOrders=Array.isArray(result.orders)?result.orders:[];
-        $("#adminConnection").textContent="Connected to the hosted FoodieHub API. Changes update the shared orders database.";renderAdminDashboard();
+        const headers={Authorization:"Bearer "+key};
+        const [result,analytics]=await Promise.all([request("/api/admin/orders",{headers}),request("/api/admin/analytics",{headers})]);
+        state.adminKey=key;state.adminSource="live";state.adminOrders=Array.isArray(result.orders)?result.orders:[];state.adminAnalytics=analytics;
+        $("#adminConnection").textContent="Connected to the live FoodieHub database. Analytics include the full order history; the table below shows the latest 100 orders.";
+        renderAdminDashboard();
       }catch(error){state.adminKey="";$("#adminError").textContent=error.message||"Admin connection failed.";}
       return;
     }
     state.adminKey="";state.adminSource="demo";
     state.adminOrders=state.orders.map(order=>({...order,customer_name:(order.customer&&order.customer.name)||"This browser",order_number:order.orderNumber,total:order.total}));
-    $("#adminConnection").textContent="Backend is not connected on this GitHub Pages site. Showing local demo orders from this browser only. Configure FOODIEHUB_API_URL and ADMIN_API_KEY for live management.";
+    state.adminAnalytics=buildDemoAdminAnalytics(state.adminOrders);
+    $("#adminConnection").textContent="Demo mode · analysing orders saved in this browser only. Connect the hosted backend to see the complete shared order history.";
     renderAdminDashboard();
   }
   async function updateAdminOrder(button){
@@ -960,6 +1019,7 @@
       }else{
         const found=state.orders.find(order=>order.orderNumber===number);if(found)found.status=status;
         saveStore(STORAGE.orders,state.orders);state.adminOrders=state.orders.map(order=>({...order,customer_name:(order.customer&&order.customer.name)||"This browser",order_number:order.orderNumber,total:order.total}));
+        state.adminAnalytics=buildDemoAdminAnalytics(state.adminOrders);
         $("#adminConnection").textContent="Demo status saved on this browser only. It is not a live delivery update.";
       }
       renderAdminDashboard();showToast("Order status updated.");
@@ -975,6 +1035,7 @@
     $("#redeemRewards").addEventListener("click",redeemRewards);
     $("#openAdmin").addEventListener("click",()=>{$("#adminError").textContent="";openDialog("adminDialog");});
     $("#adminLoginForm").addEventListener("submit",connectAdmin);
+    $$(".admin-chart-switch [data-analytics-view]").forEach(button=>button.addEventListener("click",()=>{state.adminChartView=button.dataset.analyticsView;renderAdminAnalytics();}));
     $("#adminOrdersBody").addEventListener("click",event=>{const button=event.target.closest("[data-admin-update]");if(button)updateAdminOrder(button);});
   }
 

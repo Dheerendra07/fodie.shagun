@@ -442,6 +442,55 @@ app.get("/api/admin/orders", requireAdmin, (req, res) => {
   });
 });
 
+app.get("/api/admin/analytics", requireAdmin, (req, res) => {
+  try {
+    // Orders are stored in UTC ISO format; dashboard periods are grouped in India time.
+    const localDateTime = "datetime(created_at, '+5 hours', '+30 minutes')";
+    const summary = db.prepare([
+      "SELECT COUNT(*) AS total_orders,",
+      "COALESCE(SUM(total), 0) AS gross_sales,",
+      "COALESCE(AVG(total), 0) AS average_order,",
+      "SUM(CASE WHEN status = 'delivered' THEN 1 ELSE 0 END) AS delivered_orders,",
+      "SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) AS cancelled_orders,",
+      "COUNT(DISTINCT strftime('%Y-%m', " + localDateTime + ")) AS active_months,",
+      "COUNT(DISTINCT date(" + localDateTime + ", 'weekday 0', '-6 days')) AS active_weeks",
+      "FROM orders"
+    ].join(" ")).get();
+    const monthly = db.prepare([
+      "SELECT strftime('%Y-%m', " + localDateTime + ") AS bucket,",
+      "COUNT(*) AS orders, ROUND(COALESCE(SUM(total), 0), 2) AS revenue",
+      "FROM orders GROUP BY bucket ORDER BY bucket DESC LIMIT 36"
+    ].join(" ")).all().reverse();
+    const weekly = db.prepare([
+      "SELECT date(" + localDateTime + ", 'weekday 0', '-6 days') AS bucket,",
+      "COUNT(*) AS orders, ROUND(COALESCE(SUM(total), 0), 2) AS revenue",
+      "FROM orders GROUP BY bucket ORDER BY bucket DESC LIMIT 52"
+    ].join(" ")).all().reverse();
+    const totalOrders = Number(summary.total_orders || 0);
+    const activeMonths = Number(summary.active_months || 0);
+    const activeWeeks = Number(summary.active_weeks || 0);
+    return res.json({
+      summary: {
+        totalOrders,
+        grossSales: Number(summary.gross_sales || 0),
+        averageOrder: Number(summary.average_order || 0),
+        deliveredOrders: Number(summary.delivered_orders || 0),
+        cancelledOrders: Number(summary.cancelled_orders || 0),
+        activeMonths,
+        activeWeeks,
+        averagePerActiveMonth: activeMonths ? totalOrders / activeMonths : 0,
+        averagePerActiveWeek: activeWeeks ? totalOrders / activeWeeks : 0
+      },
+      monthly,
+      weekly,
+      timezone: "Asia/Kolkata",
+      generatedAt: new Date().toISOString()
+    });
+  } catch (error) {
+    return res.status(500).json({ error: "Order analytics could not be loaded." });
+  }
+});
+
 app.patch("/api/admin/orders/:orderNumber", requireAdmin, (req, res) => {
   const allowedStatuses = ["confirmed", "preparing", "out_for_delivery", "delivered", "cancelled"];
   const status = String((req.body || {}).status || "");

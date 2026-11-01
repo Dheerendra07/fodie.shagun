@@ -15,9 +15,9 @@
   <link rel="preconnect" href="https://images.unsplash.com">
   <link rel="preconnect" href="https://images.pexels.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Serif+Display&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./assets/css/styles.css?v=checkout-glass-fix-20261102">
+  <link rel="stylesheet" href="./assets/css/styles.css?v=orders-analytics-20261102">
   <script src="./assets/js/config.js"></script>
-  <script defer src="./assets/js/app.js?v=checkout-root-fix-20261102"></script>
+  <script defer src="./assets/js/app.js?v=orders-analytics-20261102"></script>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -393,14 +393,38 @@
 
 
   <dialog class="site-dialog admin-dialog" id="adminDialog" aria-labelledby="adminTitle">
-    <div class="dialog-header"><div><span class="drawer-kicker">FOODIEHUB OPERATIONS</span><h2 id="adminTitle">Team dashboard.</h2></div><button class="close-button" type="button" data-close-dialog="adminDialog" aria-label="Close dashboard">×</button></div>
+    <div class="dialog-header"><div><span class="drawer-kicker">FOODIEHUB INTELLIGENCE</span><h2 id="adminTitle">Orders, in focus.</h2></div><button class="close-button" type="button" data-close-dialog="adminDialog" aria-label="Close dashboard">×</button></div>
     <div class="admin-content">
       <form id="adminLoginForm" class="admin-login-form"><label class="form-field">Server admin key<input id="adminKey" name="adminKey" type="password" placeholder="Enter the key configured on your backend" autocomplete="off"></label><button class="button button-primary" type="submit">Connect dashboard <span aria-hidden="true">↗</span></button></form>
-      <p class="admin-connection-note" id="adminConnection" aria-live="polite">Connect a hosted backend to manage live orders. Without one, this panel shows demo orders saved in this browser only.</p><p class="form-error" id="adminError" role="alert"></p>
-      <div class="admin-stats"><article><span>ORDERS</span><strong id="adminOrderCount">0</strong></article><article><span>GROSS SALES</span><strong id="adminRevenue">₹0</strong></article><article><span>AVERAGE ORDER</span><strong id="adminAverage">₹0</strong></article></div>
+      <p class="admin-connection-note" id="adminConnection" aria-live="polite">Connect your hosted backend for complete order intelligence. Demo mode analyses orders saved in this browser only.</p><p class="form-error" id="adminError" role="alert"></p>
+      <section class="admin-stats" aria-label="Lifetime order summary">
+        <article><span>ALL-TIME ORDERS</span><strong id="adminOrderCount">0</strong><small>Across your order history</small></article>
+        <article><span>GROSS SALES</span><strong id="adminRevenue">₹0</strong><small>Order value recorded</small></article>
+        <article><span>AVERAGE ORDER</span><strong id="adminAverage">₹0</strong><small>Average basket value</small></article>
+        <article><span>AVG. ORDERS / WEEK</span><strong id="adminWeeklyAverage">0</strong><small>Across active weeks</small></article>
+      </section>
+      <section class="admin-analytics" aria-labelledby="adminAnalyticsTitle">
+        <div class="admin-analytics-heading">
+          <div><span class="drawer-kicker">YOUR ORDER RHYTHM</span><h3 id="adminAnalyticsTitle">Monthly & weekly trends.</h3><p>See how often orders come in and how that changes over time.</p></div>
+          <div class="admin-chart-switch" role="group" aria-label="Choose analytics period">
+            <button type="button" data-analytics-view="month" aria-pressed="true">Monthly</button>
+            <button type="button" data-analytics-view="week" aria-pressed="false">Weekly</button>
+          </div>
+        </div>
+        <div class="admin-analytics-overview">
+          <article class="admin-current-period"><span id="adminCurrentPeriodLabel">THIS MONTH</span><strong id="adminCurrentPeriodOrders">0 orders</strong><small id="adminCurrentPeriodRevenue">₹0 recorded revenue</small></article>
+          <article><span>AVERAGE / ACTIVE MONTH</span><strong id="adminMonthlyAverage">0</strong><small>Orders in months with activity</small></article>
+          <article><span>BUSIEST PERIOD</span><strong id="adminPeakPeriod">—</strong><small id="adminPeakOrders">No orders yet</small></article>
+        </div>
+        <div class="admin-chart-panel">
+          <div class="admin-chart-header"><div><span class="drawer-kicker">ORDER VOLUME</span><h4 id="adminChartTitle">Orders per month</h4></div><span id="adminChartRange">Last 12 months</span></div>
+          <div class="admin-chart-plot" id="adminAnalyticsChart" role="img" aria-label="Order volume chart"><p class="admin-chart-empty">Connect the dashboard to view your order trends.</p></div>
+          <div class="admin-chart-footnote"><span><i></i> Orders placed</span><span id="adminTimezoneNote">Dates shown in India time</span></div>
+        </div>
+      </section>
       <div class="admin-table-heading"><div><span class="drawer-kicker">THE LATEST ACTIVITY</span><h3>Order management</h3></div><span id="adminSourceLabel">Not connected</span></div>
       <div class="admin-table-wrap"><table class="admin-table"><thead><tr><th>Order</th><th>Customer</th><th>Total</th><th>Status</th><th>Update</th></tr></thead><tbody id="adminOrdersBody"><tr><td colspan="5">Connect the dashboard to view orders.</td></tr></tbody></table></div>
-      <p class="admin-security-note">The admin key stays in page memory only. Configure <code>ADMIN_API_KEY</code> on the Node server to enable live order management.</p>
+      <p class="admin-security-note">The admin key stays in page memory only. Configure <code>ADMIN_API_KEY</code> on the Node server to enable live order management. Demo analytics are limited to this browser's saved order history.</p>
     </div>
   </dialog>
 
