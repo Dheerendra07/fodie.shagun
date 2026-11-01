@@ -34,8 +34,21 @@ jobs:
         run: |
           mkdir -p _site
           cp index.html FoodieHub_Logo_Dark.svg FoodieHub_Logo_Light.svg FoodieHub_Logo_Icon.svg _site/
+          cp foodiehub-ui-refinement.css _site/
           cp .nojekyll _site/.nojekyll
+          python - <<'PY'
+          from pathlib import Path
+          page = Path("_site/index.html")
+          html = page.read_text(encoding="utf-8")
+          stylesheet = '  <link rel="stylesheet" href="foodiehub-ui-refinement.css">\\n'
+          if "foodiehub-ui-refinement.css" not in html:
+              if "</head>" not in html:
+                  raise SystemExit("Could not find </head> in index.html")
+              html = html.replace("</head>", stylesheet + "</head>", 1)
+          page.write_text(html, encoding="utf-8")
+          PY
           test -s _site/index.html
+          test -s _site/foodiehub-ui-refinement.css
 
       - name: Upload website artifact
         uses: actions/upload-pages-artifact@v4
