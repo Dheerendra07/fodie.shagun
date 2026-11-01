@@ -305,6 +305,47 @@
     </form>
   </dialog>
 
+
+  <dialog class="site-dialog dish-detail-dialog" id="dishDetailDialog" aria-labelledby="customizerTitle">
+    <div class="customizer-hero">
+      <div class="customizer-image-wrap"><img id="customizerImage" alt=""></div>
+      <div class="customizer-hero-copy">
+        <span class="drawer-kicker">PERSONALISE YOUR PLATE</span>
+        <h2 id="customizerTitle">Make it yours.</h2>
+        <p id="customizerDescription"></p>
+        <div class="customizer-starting-price"><span>Starting at</span><strong id="customizerBasePrice">₹0</strong></div>
+      </div>
+      <button class="close-button customizer-close" type="button" data-close-dialog="dishDetailDialog" aria-label="Close dish details">×</button>
+    </div>
+    <form id="dishCustomizerForm" class="dish-customizer-form">
+      <section class="customizer-section">
+        <div class="customizer-section-heading"><div><span>01</span><strong>Choose your portion</strong></div><small>Just the right amount</small></div>
+        <div class="customizer-size-options" id="customizerSizeOptions"></div>
+      </section>
+      <section class="customizer-section">
+        <div class="customizer-section-heading"><div><span>02</span><strong>Add a little extra</strong></div><small>Optional add-ons</small></div>
+        <div class="customizer-addon-list" id="customizerAddonOptions"></div>
+      </section>
+      <section class="customizer-section">
+        <div class="customizer-section-heading"><div><span>03</span><strong>Make it your way</strong></div><small>Kitchen preferences</small></div>
+        <div class="customizer-preferences" id="customizerPreferenceOptions"></div>
+      </section>
+      <label class="customizer-note-label">Anything else for the kitchen?
+        <textarea id="customizerNote" rows="2" maxlength="180" placeholder="Example: Keep the sauce on the side..."></textarea>
+      </label>
+      <div class="customizer-total-row"><span>Price per plate</span><strong id="customizerUnitPrice">₹0</strong></div>
+      <div class="customizer-footer">
+        <div class="customizer-quantity" aria-label="Quantity selector">
+          <button type="button" id="customizerQtyMinus" aria-label="Decrease quantity">−</button>
+          <strong id="customizerQty">1</strong>
+          <button type="button" id="customizerQtyPlus" aria-label="Increase quantity">+</button>
+        </div>
+        <button class="button button-primary customizer-submit" type="submit">Add to bag <span id="customizerTotal">₹0</span></button>
+      </div>
+      <p class="customizer-footnote">Your choices are saved with this dish in your demo bag.</p>
+    </form>
+  </dialog>
+
   <dialog class="site-dialog tracking-dialog" id="trackingDialog" aria-labelledby="trackingTitle">
     <div class="dialog-header"><div><span class="drawer-kicker">A LITTLE ORDER UPDATE</span><h2 id="trackingTitle">Track your order.</h2></div><button class="close-button" type="button" data-close-dialog="trackingDialog" aria-label="Close tracking">×</button></div>
     <form id="trackingForm" class="tracking-form">
@@ -338,6 +379,7 @@
         <div class="dish-topline"><span class="dish-category" data-category-label></span><span class="dish-time" data-prep></span></div>
         <h3 data-name></h3>
         <p class="dish-description" data-description></p>
+        <button class="customize-link" type="button" data-customize>View details & customize <span aria-hidden="true">↗</span></button>
         <div class="dish-bottom">
           <div class="dish-prices"><strong data-price></strong><del data-original></del></div>
           <button class="add-button" type="button" data-add><span aria-hidden="true">＋</span> Add</button>
