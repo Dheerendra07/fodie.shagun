@@ -154,6 +154,39 @@
     if (dialog && dialog.open) dialog.close();
   }
 
+  const ADDRESS_FIELDS=["house","building","street","area","landmark","town","city","district","state","pincode"];
+  function readAddressDetails(formData){
+    const details={};
+    ADDRESS_FIELDS.forEach(field=>{details[field]=String(formData.get(field)||"").trim();});
+    return details;
+  }
+  function formatDeliveryAddress(details){
+    const d=details||{};
+    const lines=[
+      [d.house,d.building].filter(Boolean).join(", "),
+      [d.street,d.area].filter(Boolean).join(", "),
+      d.landmark?("Landmark: "+d.landmark):"",
+      [d.town,d.city].filter(Boolean).join(", "),
+      [d.district,d.state].filter(Boolean).join(", ")+(d.pincode?" - "+d.pincode:"")
+    ].filter(Boolean);
+    return lines.join(", ");
+  }
+  function fillAddressFields(form,details){
+    const source=details||{};
+    ADDRESS_FIELDS.forEach(field=>{
+      const control=form.elements.namedItem(field);
+      if(control)control.value=source[field]||"";
+    });
+  }
+  function updateAddressPreview(formId,previewId){
+    const form=$("#"+formId),preview=$("#"+previewId);
+    if(!form||!preview)return;
+    const details=readAddressDetails(new FormData(form));
+    const formatted=formatDeliveryAddress(details);
+    preview.textContent=formatted||"Your complete delivery address will appear here as you fill in the details.";
+    preview.classList.toggle("is-filled",Boolean(formatted));
+  }
+
   function renderProfile() {
     const name = String(state.profile.name || "").trim();
     $("#profileTriggerLabel").textContent = name ? name.split(/\s+/)[0] : "Profile";
@@ -162,9 +195,11 @@
 
   function openProfile() {
     const form = $("#profileForm");
-    ["name", "phone", "email", "address"].forEach(field => {
+    ["name", "phone", "email"].forEach(field => {
       form.elements.namedItem(field).value = state.profile[field] || "";
     });
+    fillAddressFields(form,state.profile.addressDetails||{});
+    updateAddressPreview("profileForm","profileAddressPreview");
     $("#profileError").textContent = "";
     $("#profileMessage").textContent = state.profile.name || state.profile.address
       ? "Your saved details are ready to edit."
@@ -180,11 +215,13 @@
       $("#profileError").textContent = "Enter a valid 10-digit Indian mobile number, or leave it blank.";
       return;
     }
+    const addressDetails=readAddressDetails(form);
     state.profile = {
       name: String(form.get("name") || "").trim(),
       phone,
       email: String(form.get("email") || "").trim(),
-      address: String(form.get("address") || "").trim()
+      addressDetails,
+      address: formatDeliveryAddress(addressDetails)
     };
     saveStore(STORAGE.profile, state.profile);
     renderProfile();
@@ -602,9 +639,11 @@
     $("#checkoutError").textContent = "";
     const checkoutForm = $("#checkoutForm");
     checkoutForm.reset();
-    ["name", "phone", "email", "address"].forEach(field => {
+    ["name", "phone", "email"].forEach(field => {
       checkoutForm.elements.namedItem(field).value = state.profile[field] || "";
     });
+    fillAddressFields(checkoutForm,state.profile.addressDetails||{});
+    updateAddressPreview("checkoutForm","checkoutAddressPreview");
     $("#saveCheckoutProfile").checked = true;
     renderPaymentAvailability();
     renderCart();
@@ -714,11 +753,13 @@
   async function placeOrder(event) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const addressDetails=readAddressDetails(form);
     const customer = {
       name: String(form.get("name") || "").trim(),
       phone: String(form.get("phone") || "").replace(/\D/g, "").slice(-10),
       email: String(form.get("email") || "").trim(),
-      address: String(form.get("address") || "").trim()
+      addressDetails,
+      address: formatDeliveryAddress(addressDetails)
     };
     if (customer.name.length < 2) {
       $("#checkoutError").textContent = "Please enter your name.";
@@ -728,8 +769,16 @@
       $("#checkoutError").textContent = "Please enter a valid 10-digit Indian mobile number.";
       return;
     }
-    if (customer.address.length < 12) {
-      $("#checkoutError").textContent = "Please enter your complete delivery address.";
+    const missingAddressField=ADDRESS_FIELDS.filter(field=>!["building","landmark"].includes(field)&&!addressDetails[field]);
+    if(missingAddressField.length){
+      $("#checkoutError").textContent = "Please complete all required delivery address fields.";
+      const firstMissing=event.currentTarget.elements.namedItem(missingAddressField[0]);
+      if(firstMissing)firstMissing.focus();
+      return;
+    }
+    if(!/^[1-9][0-9]{5}$/.test(addressDetails.pincode)){
+      $("#checkoutError").textContent = "Enter a valid 6-digit Indian PIN code.";
+      event.currentTarget.elements.namedItem("pincode").focus();
       return;
     }
     const paymentMethod = String(form.get("paymentMethod") || "cod");
@@ -763,7 +812,7 @@
           createdAt: new Date().toISOString(),
           message: "Demo order saved on this device only."
         };
-        saveLocalOrder({ ...order, phone: customer.phone, items: payload.items, customer, paymentMethod });
+        saveLocalOrder({ ...order, phone: customer.phone, items: payload.items, customer, addressDetails: customer.addressDetails, paymentMethod });
       }
       finalizeOrder(order, customer, payload, "delivery");
     } catch (error) {
@@ -986,7 +1035,10 @@
     $("#adminOrdersBody").innerHTML=orders.map(order=>{
       const number=order.order_number||order.orderNumber||"FH-UNKNOWN",name=order.customer_name||(order.customer&&order.customer.name)||"Demo customer",status=normalizeAdminStatus(order.status);
       const choices=["confirmed","preparing","out_for_delivery","delivered","cancelled"],itemCount=Array.isArray(order.items)?order.items.reduce((sum,item)=>sum+Number(item.quantity||1),0):0;
-      return '<tr data-admin-row="'+escapeHTML(number)+'"><td><strong>'+escapeHTML(number)+'</strong><small>'+itemCount+' items</small></td><td>'+escapeHTML(name)+'</td><td>'+money(order.total)+'</td><td><select data-admin-status aria-label="Status for '+escapeHTML(number)+'">'+choices.map(choice=>'<option value="'+choice+'"'+(choice===status?" selected":"")+'>'+choice.replace(/_/g," ")+'</option>').join("")+'</select></td><td><button type="button" class="button button-outline admin-update-button" data-admin-update="'+escapeHTML(number)+'">Save</button></td></tr>';
+      const address=order.addressDetails||(order.customer&&order.customer.addressDetails)||{};
+      const location=[address.city,address.district,address.state].filter(Boolean).join(", ");
+      const postal=address.pincode||"";
+      return '<tr data-admin-row="'+escapeHTML(number)+'"><td><strong>'+escapeHTML(number)+'</strong><small>'+itemCount+' items</small></td><td>'+escapeHTML(name)+'<small>'+escapeHTML([location,postal].filter(Boolean).join(" · ")||"Address on file")+'</small></td><td>'+money(order.total)+'</td><td><select data-admin-status aria-label="Status for '+escapeHTML(number)+'">'+choices.map(choice=>'<option value="'+choice+'"'+(choice===status?" selected":"")+'>'+choice.replace(/_/g," ")+'</option>').join("")+'</select></td><td><button type="button" class="button button-outline admin-update-button" data-admin-update="'+escapeHTML(number)+'">Save</button></td></tr>';
     }).join("");
   }
   async function connectAdmin(event){
@@ -1071,6 +1123,12 @@
     $("#openCart").addEventListener("click", openCart);
     $("#openProfile").addEventListener("click", openProfile);
     $("#profileForm").addEventListener("submit", saveProfile);
+    ["checkoutForm","profileForm"].forEach(formId=>{
+      const form=$("#"+formId);
+      const previewId=formId==="checkoutForm"?"checkoutAddressPreview":"profileAddressPreview";
+      form.addEventListener("input",()=>updateAddressPreview(formId,previewId));
+      form.addEventListener("change",()=>updateAddressPreview(formId,previewId));
+    });
     $("#closeCart").addEventListener("click", closeCart);
     $("#cartBackdrop").addEventListener("click", closeCart);
     $("#cartDrawer").addEventListener("click", event => {

@@ -30,6 +30,9 @@ const existingOrderColumns = new Set(db.pragma("table_info(orders)").map(column 
 if (!existingOrderColumns.has("gateway_order_id")) {
   db.exec("ALTER TABLE orders ADD COLUMN gateway_order_id TEXT");
 }
+if (!existingOrderColumns.has("address_json")) {
+  db.exec("ALTER TABLE orders ADD COLUMN address_json TEXT");
+}
 db.exec("CREATE UNIQUE INDEX IF NOT EXISTS idx_orders_gateway_order_id ON orders(gateway_order_id) WHERE gateway_order_id IS NOT NULL");
 
 const MENU_PATH = path.join(ROOT, "data", "menu.json");
@@ -275,12 +278,35 @@ function validateCustomer(customer) {
   const name = String(source.name || "").trim();
   const phone = cleanPhone(source.phone);
   const email = String(source.email || "").trim().toLowerCase();
-  const address = String(source.address || "").trim();
+  const rawAddress = source.addressDetails && typeof source.addressDetails === "object" ? source.addressDetails : {};
+  const addressDetails = {
+    house: String(rawAddress.house || "").trim(),
+    building: String(rawAddress.building || "").trim(),
+    street: String(rawAddress.street || "").trim(),
+    area: String(rawAddress.area || "").trim(),
+    landmark: String(rawAddress.landmark || "").trim(),
+    town: String(rawAddress.town || "").trim(),
+    city: String(rawAddress.city || "").trim(),
+    district: String(rawAddress.district || "").trim(),
+    state: String(rawAddress.state || "").trim(),
+    pincode: String(rawAddress.pincode || "").replace(/\D/g, "")
+  };
   if (name.length < 2 || name.length > 80) { const error = new Error("Please enter a valid name."); error.status = 400; throw error; }
-  if (!/^[6-9]\d{9}$/.test(phone)) { const error = new Error("Please enter a valid 10-digit mobile number."); error.status = 400; throw error; }
+  if (!/^[6-9]\d{9}$/.test(phone)) { const error = new Error("Please enter a valid 10-digit Indian mobile number."); error.status = 400; throw error; }
   if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { const error = new Error("Please enter a valid email address."); error.status = 400; throw error; }
-  if (address.length < 12 || address.length > 500) { const error = new Error("Please enter a complete delivery address."); error.status = 400; throw error; }
-  return { name, phone, email, address };
+  const requiredAddressFields = ["house", "street", "area", "town", "city", "district", "state"];
+  const missing = requiredAddressFields.filter(field => !addressDetails[field]);
+  if (missing.length) { const error = new Error("Complete the house, street, area, town, city, district and state address fields."); error.status = 400; throw error; }
+  if (!/^[1-9]\d{5}$/.test(addressDetails.pincode)) { const error = new Error("Enter a valid 6-digit Indian PIN code."); error.status = 400; throw error; }
+  const address = [
+    [addressDetails.house, addressDetails.building].filter(Boolean).join(", "),
+    [addressDetails.street, addressDetails.area].filter(Boolean).join(", "),
+    addressDetails.landmark ? "Landmark: " + addressDetails.landmark : "",
+    [addressDetails.town, addressDetails.city].join(", "),
+    [addressDetails.district, addressDetails.state].join(", ") + " - " + addressDetails.pincode
+  ].filter(Boolean).join(", ");
+  if (address.length > 500) { const error = new Error("Please shorten your delivery address."); error.status = 400; throw error; }
+  return { name, phone, email, address, addressDetails };
 }
 function razorpayEnabled() {
   return Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
@@ -324,10 +350,10 @@ app.post("/api/payments/create-order", async (req, res, next) => {
       throw error;
     }
     db.prepare([
-      "INSERT INTO orders (order_number, customer_name, phone, email, address, items_json, subtotal, coupon_code, coupon_discount, delivery_fee, tax, total, payment_method, payment_status, status, created_at, gateway_order_id)",
-      "VALUES (@orderNumber, @name, @phone, @email, @address, @itemsJson, @subtotal, @couponCode, @couponDiscount, @deliveryFee, @tax, @total, 'razorpay', 'created', 'payment_pending', @createdAt, @gatewayOrderId)"
+      "INSERT INTO orders (order_number, customer_name, phone, email, address, address_json, items_json, subtotal, coupon_code, coupon_discount, delivery_fee, tax, total, payment_method, payment_status, status, created_at, gateway_order_id)",
+      "VALUES (@orderNumber, @name, @phone, @email, @address, @addressJson, @itemsJson, @subtotal, @couponCode, @couponDiscount, @deliveryFee, @tax, @total, 'razorpay', 'created', 'payment_pending', @createdAt, @gatewayOrderId)"
     ].join(" ")).run({
-      orderNumber, ...customer, itemsJson: JSON.stringify(bill.items), subtotal: bill.subtotal,
+      orderNumber, ...customer, addressJson: JSON.stringify(customer.addressDetails), itemsJson: JSON.stringify(bill.items), subtotal: bill.subtotal,
       couponCode: bill.couponCode, couponDiscount: bill.couponDiscount, deliveryFee: bill.deliveryFee,
       tax: bill.tax, total: bill.total, createdAt, gatewayOrderId: gatewayOrder.id
     });
@@ -395,10 +421,10 @@ app.post("/api/orders", (req, res, next) => {
     const orderNumber = createOrderNumber();
     const createdAt = new Date().toISOString();
     db.prepare([
-      "INSERT INTO orders (order_number, customer_name, phone, email, address, items_json, subtotal, coupon_code, coupon_discount, delivery_fee, tax, total, payment_method, payment_status, status, created_at)",
-      "VALUES (@orderNumber, @name, @phone, @email, @address, @itemsJson, @subtotal, @couponCode, @couponDiscount, @deliveryFee, @tax, @total, @paymentMethod, 'pending', 'confirmed', @createdAt)"
+      "INSERT INTO orders (order_number, customer_name, phone, email, address, address_json, items_json, subtotal, coupon_code, coupon_discount, delivery_fee, tax, total, payment_method, payment_status, status, created_at)",
+      "VALUES (@orderNumber, @name, @phone, @email, @address, @addressJson, @itemsJson, @subtotal, @couponCode, @couponDiscount, @deliveryFee, @tax, @total, @paymentMethod, 'pending', 'confirmed', @createdAt)"
     ].join(" ")).run({
-      orderNumber, name, phone, email, address,
+      orderNumber, name, phone, email, address, addressJson: JSON.stringify(customer.addressDetails),
       itemsJson: JSON.stringify(bill.items),
       subtotal: bill.subtotal,
       couponCode: bill.couponCode,
@@ -435,10 +461,14 @@ app.get("/api/orders/track", (req, res) => {
 });
 
 app.get("/api/admin/orders", requireAdmin, (req, res) => {
-  const rows = db.prepare("SELECT order_number, customer_name, phone, email, address, items_json, subtotal, coupon_code, coupon_discount, delivery_fee, tax, total, payment_method, payment_status, status, created_at FROM orders ORDER BY created_at DESC LIMIT 100").all();
+  const rows = db.prepare("SELECT order_number, customer_name, phone, email, address, address_json, items_json, subtotal, coupon_code, coupon_discount, delivery_fee, tax, total, payment_method, payment_status, status, created_at FROM orders ORDER BY created_at DESC LIMIT 100").all();
   res.json({
     count: rows.length,
-    orders: rows.map(row => ({ ...row, items: JSON.parse(row.items_json) }))
+    orders: rows.map(row => ({
+      ...row,
+      addressDetails: row.address_json ? JSON.parse(row.address_json) : null,
+      items: JSON.parse(row.items_json)
+    }))
   });
 });
 
