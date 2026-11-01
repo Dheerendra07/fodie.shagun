@@ -9,7 +9,8 @@
     cart: "foodiehub.cart.v2",
     favourites: "foodiehub.favourites.v2",
     theme: "foodiehub.theme.v2",
-    orders: "foodiehub.orders.v2"
+    orders: "foodiehub.orders.v2",
+    profile: "foodiehub.profile.v1"
   };
 
   const state = {
@@ -17,6 +18,7 @@
     cart: readStore(STORAGE.cart, {}),
     favourites: readStore(STORAGE.favourites, []),
     orders: readStore(STORAGE.orders, []),
+    profile: readStore(STORAGE.profile, { name: "", phone: "", email: "", address: "" }),
     category: "All",
     diet: "all",
     query: "",
@@ -99,6 +101,45 @@
     if (dialog && dialog.open) dialog.close();
   }
 
+  function renderProfile() {
+    const name = String(state.profile.name || "").trim();
+    $("#profileTriggerLabel").textContent = name ? name.split(/\s+/)[0] : "Profile";
+    $("#openProfile").setAttribute("aria-label", name ? "Open profile for " + name : "Open your profile");
+  }
+
+  function openProfile() {
+    const form = $("#profileForm");
+    ["name", "phone", "email", "address"].forEach(field => {
+      form.elements.namedItem(field).value = state.profile[field] || "";
+    });
+    $("#profileError").textContent = "";
+    $("#profileMessage").textContent = state.profile.name || state.profile.address
+      ? "Your saved details are ready to edit."
+      : "Add your details and delivery address here.";
+    openDialog("profileDialog");
+  }
+
+  function saveProfile(event) {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const phone = String(form.get("phone") || "").replace(/\D/g, "").slice(-10);
+    if (phone && (phone.length !== 10 || !/^[6-9]/.test(phone))) {
+      $("#profileError").textContent = "Enter a valid 10-digit Indian mobile number, or leave it blank.";
+      return;
+    }
+    state.profile = {
+      name: String(form.get("name") || "").trim(),
+      phone,
+      email: String(form.get("email") || "").trim(),
+      address: String(form.get("address") || "").trim()
+    };
+    saveStore(STORAGE.profile, state.profile);
+    renderProfile();
+    $("#profileError").textContent = "";
+    $("#profileMessage").textContent = "Saved on this browser. Your next checkout can use these details.";
+    showToast("Your profile and delivery address have been saved.");
+  }
+
   function renderCategories() {
     const categories = ["All", ...new Set(state.menu.map(item => item.category))];
     $("#categoryTabs").innerHTML = categories.map(category => {
@@ -165,7 +206,7 @@
       favourite.textContent = saved ? "♥" : "♡";
       favourite.setAttribute("aria-label", saved ? "Remove from favourites" : "Add to favourites");
       favourite.addEventListener("click", () => toggleFavourite(item.id));
-      $("[data-add]", card).addEventListener("click", () => addToCart(item.id));
+      $("[data-add]", card).addEventListener("click", event => addToCart(item.id, event.currentTarget));
       grid.appendChild(card);
     });
   }
@@ -179,11 +220,53 @@
     showToast(state.favourites.includes(id) ? "Saved to your favourites." : "Removed from your favourites.");
   }
 
-  function addToCart(id) {
+  function addToCart(id, button) {
     state.cart[id] = (state.cart[id] || 0) + 1;
     saveStore(STORAGE.cart, state.cart);
     renderCart();
+    animateAddToCart(button);
     showToast("A delicious choice. Added to your bag!");
+  }
+
+  function animateAddToCart(button) {
+    const cartButton = $("#openCart");
+    const card = button ? button.closest(".dish-card") : null;
+    const sourceImage = card ? $(".dish-image", card) : null;
+    if (button) {
+      button.classList.add("is-added");
+      button.innerHTML = '<span aria-hidden="true">✓</span> Added';
+      window.setTimeout(() => {
+        if (button.isConnected) {
+          button.classList.remove("is-added");
+          button.innerHTML = '<span aria-hidden="true">＋</span> Add';
+        }
+      }, 900);
+    }
+    if (!cartButton || !sourceImage || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const from = sourceImage.getBoundingClientRect();
+    const to = cartButton.getBoundingClientRect();
+    const flyer = document.createElement("img");
+    flyer.className = "cart-flight";
+    flyer.src = sourceImage.currentSrc || sourceImage.src;
+    flyer.alt = "";
+    flyer.setAttribute("aria-hidden", "true");
+    flyer.style.left = (from.left + from.width / 2 - 28) + "px";
+    flyer.style.top = (from.top + from.height / 2 - 28) + "px";
+    document.body.appendChild(flyer);
+    const dx = to.left + to.width / 2 - (from.left + from.width / 2);
+    const dy = to.top + to.height / 2 - (from.top + from.height / 2);
+    const flight = flyer.animate([
+      { transform: "translate3d(0,0,0) scale(1)", opacity: 1 },
+      { transform: "translate3d(" + dx + "px," + dy + "px,0) scale(.18)", opacity: .15 }
+    ], { duration: 640, easing: "cubic-bezier(.22,.72,.28,1)" });
+    flight.onfinish = () => flyer.remove();
+    cartButton.classList.remove("cart-bump");
+    $("#cartCount").classList.remove("count-pop");
+    void cartButton.offsetWidth;
+    cartButton.classList.add("cart-bump");
+    $("#cartCount").classList.add("count-pop");
+    window.setTimeout(() => cartButton.classList.remove("cart-bump"), 520);
+    window.setTimeout(() => $("#cartCount").classList.remove("count-pop"), 460);
   }
 
   function changeQuantity(id, change) {
@@ -304,6 +387,11 @@
     closeCart();
     $("#checkoutError").textContent = "";
     $("#checkoutForm").reset();
+    const checkoutForm = $("#checkoutForm");
+    ["name", "phone", "email", "address"].forEach(field => {
+      checkoutForm.elements.namedItem(field).value = state.profile[field] || "";
+    });
+    $("#saveCheckoutProfile").checked = true;
     renderCart();
     openDialog("checkoutDialog");
   }
@@ -349,6 +437,11 @@
           message: "Demo order saved on this device only."
         };
         saveLocalOrder({ ...order, phone: customer.phone, items: payload.items, customer });
+      }
+      if ($("#saveCheckoutProfile").checked) {
+        state.profile = customer;
+        saveStore(STORAGE.profile, state.profile);
+        renderProfile();
       }
       state.cart = {};
       state.coupon = null;
@@ -425,6 +518,8 @@
 
   function bindEvents() {
     $("#openCart").addEventListener("click", openCart);
+    $("#openProfile").addEventListener("click", openProfile);
+    $("#profileForm").addEventListener("submit", saveProfile);
     $("#closeCart").addEventListener("click", closeCart);
     $("#cartBackdrop").addEventListener("click", closeCart);
     $("#checkoutButton").addEventListener("click", openCheckout);
@@ -482,6 +577,7 @@
     setTheme(readStore(STORAGE.theme, "light"));
     $("#currentYear").textContent = new Date().getFullYear();
     bindEvents();
+    renderProfile();
     renderCart();
     try {
       await Promise.all([checkBackend()]);
