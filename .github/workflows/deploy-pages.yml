@@ -49,6 +49,7 @@ jobs:
           cp index.html _site/
           cp FoodieHub_Logo_Dark.svg FoodieHub_Logo_Light.svg FoodieHub_Logo_Icon.svg _site/
           cp -R assets/css assets/js _site/assets/
+          cp -R fittrack _site/fittrack
           cp data/menu.json _site/data/
           touch _site/.nojekyll
           test -s _site/index.html
