@@ -1088,6 +1088,57 @@
     }catch(error){$("#adminError").textContent=error.message||"The order status could not be updated.";}
     finally{button.disabled=false;}
   }
+
+  function customerOrderStatus(status){
+    const value=String(status||"confirmed").toLowerCase();
+    const labels={demo_saved:"Placed · demo",confirmed:"Confirmed",preparing:"Preparing",out_for_delivery:"On the way",delivered:"Delivered",cancelled:"Cancelled",payment_pending:"Payment pending",failed:"Payment failed"};
+    const kind=value==="delivered"?"is-delivered":value==="cancelled"?"is-cancelled":(["preparing","out_for_delivery"].includes(value)?"is-progress":"is-placed");
+    return {label:labels[value]||value.replace(/_/g," "),kind};
+  }
+  function customerOrderDate(order){
+    const date=new Date(order.createdAt||order.created_at||"");
+    return Number.isNaN(date.getTime())?"Date not available":date.toLocaleString("en-IN",{day:"numeric",month:"short",year:"numeric",hour:"numeric",minute:"2-digit"});
+  }
+  function renderMyDashboard(){
+    const phone=String(state.profile.phone||"").replace(/\D/g,"").slice(-10);
+    const name=String(state.profile.name||"").trim();
+    $("#myDashboardGreeting").textContent=name?"Hello, "+name.split(/\s+/)[0]+".":"Hello, foodie.";
+    const orders=phone?state.orders.filter(order=>String(order.phone||(order.customer&&order.customer.phone)||"").replace(/\D/g,"").slice(-10)===phone).slice().sort((a,b)=>new Date(b.createdAt||b.created_at||0).getTime()-new Date(a.createdAt||a.created_at||0).getTime()):[];
+    const activeOrders=orders.filter(order=>!["cancelled","payment_pending","failed"].includes(String(order.status||"").toLowerCase()));
+    const totalValue=activeOrders.reduce((sum,order)=>sum+Math.max(0,Number(order.total||0)),0);
+    const delivered=orders.filter(order=>String(order.status||"").toLowerCase()==="delivered").length;
+    $("#myOrderCount").textContent=orders.length.toLocaleString("en-IN");
+    $("#myTotalValue").textContent=money(totalValue);
+    $("#myDeliveredCount").textContent=delivered.toLocaleString("en-IN");
+    $("#myAverageOrder").textContent=money(activeOrders.length?totalValue/activeOrders.length:0);
+    $("#myDashboardOrderRange").textContent=orders.length+" "+(orders.length===1?"order":"orders");
+    $("#myDashboardIntro").textContent=phone?"Showing orders matched to the mobile number ending in "+phone.slice(-4)+".":"Save the mobile number you use at checkout in your Profile to see your order history.";
+    const list=$("#myOrdersList");
+    if(!phone){
+      list.innerHTML='<div class="my-orders-empty"><span aria-hidden="true">◉</span><h4>One quick profile step.</h4><p>Add the same mobile number you use at checkout. We use it to match your orders on this browser.</p><button class="button button-primary" type="button" data-edit-my-profile>Update my profile ↗</button></div>';
+    }else if(!orders.length){
+      list.innerHTML='<div class="my-orders-empty"><span aria-hidden="true">⌁</span><h4>No orders found yet.</h4><p>We could not find orders for the mobile number saved in your profile on this browser.</p><button class="button button-outline" type="button" data-browse-menu>Explore the menu ↗</button></div>';
+    }else{
+      list.innerHTML=orders.slice(0,8).map(order=>{
+        const number=String(order.orderNumber||order.order_number||"FH-ORDER"),status=customerOrderStatus(order.status),items=Array.isArray(order.items)?order.items:[];
+        const quantity=items.reduce((sum,item)=>sum+Math.max(1,Number(item.quantity||1)),0);
+        const names=items.map(item=>{const id=item.productId||item.product_id||item.id,product=state.menu.find(entry=>entry.id===id);return (product&&product.name)||item.name||item.productName||"Food item";});
+        const preview=names.slice(0,2).join(" · ")||(quantity+" "+(quantity===1?"item":"items")),more=names.length>2?" +"+(names.length-2)+" more":"";
+        return '<article class="my-order-card"><div class="my-order-top"><div><strong>'+escapeHTML(number)+'</strong><small>'+escapeHTML(customerOrderDate(order))+'</small></div><span class="my-order-status '+status.kind+'">'+escapeHTML(status.label)+'</span></div><div class="my-order-bottom"><div><strong>'+quantity+' '+(quantity===1?"item":"items")+'</strong><small>'+escapeHTML(preview+more)+'</small></div><strong class="my-order-value">'+money(order.total||0)+'</strong></div><div class="my-order-actions"><button type="button" data-track-my-order="'+escapeHTML(number)+'">Track this order <span aria-hidden="true">↗</span></button></div></article>';
+      }).join("")+(orders.length>8?'<p class="my-orders-more">Showing the latest 8 of '+orders.length+' orders.</p>':"");
+    }
+    $("#myDashboardNote").textContent="Demo history is matched against your saved mobile number and stays in this browser only. It is not synced across devices or accounts.";
+  }
+  function openMyDashboard(){renderMyDashboard();openDialog("myDashboardDialog");}
+  function handleMyDashboardAction(event){
+    const edit=event.target.closest("[data-edit-my-profile]");
+    if(edit){closeDialog("myDashboardDialog");openProfile();return;}
+    const browse=event.target.closest("[data-browse-menu]");
+    if(browse){closeDialog("myDashboardDialog");$("#menu").scrollIntoView({behavior:"smooth"});return;}
+    const track=event.target.closest("[data-track-my-order]");
+    if(track){const orderNumber=track.dataset.trackMyOrder;closeDialog("myDashboardDialog");openTracking();$("#trackingForm").elements.namedItem("orderNumber").value=orderNumber;$("#trackingForm").elements.namedItem("phone").value=String(state.profile.phone||"");}
+  }
+
   function openTeamDashboard(){
     $("#adminError").textContent="";
     if(state.backendOnline){
@@ -1166,7 +1217,9 @@
     $("#trackingForm").addEventListener("submit", trackOrder);
     $("#trackOrderLink").addEventListener("click", openTracking);
     $("#trackOrderHome").addEventListener("click", openTracking);
-    $("#openAdminHome").addEventListener("click", openTeamDashboard);
+    $("#openMyDashboard").addEventListener("click", openMyDashboard);
+    $("#myDashboardEditProfile").addEventListener("click",()=>{closeDialog("myDashboardDialog");openProfile();});
+    $("#myOrdersList").addEventListener("click",handleMyDashboardAction);
     bindFeatureEvents();
     $("#successDone").addEventListener("click", () => closeDialog("successDialog"));
     $("#newsletterForm").addEventListener("submit", subscribe);

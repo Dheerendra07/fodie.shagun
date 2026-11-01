@@ -15,9 +15,9 @@
   <link rel="preconnect" href="https://images.unsplash.com">
   <link rel="preconnect" href="https://images.pexels.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Serif+Display&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./assets/css/styles.css?v=home-quick-access-20261102">
+  <link rel="stylesheet" href="./assets/css/styles.css?v=my-dashboard-20261102">
   <script src="./assets/js/config.js"></script>
-  <script defer src="./assets/js/app.js?v=home-quick-access-20261102"></script>
+  <script defer src="./assets/js/app.js?v=my-dashboard-20261102"></script>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -71,11 +71,11 @@
   </header>
 
   <main>
-    <section class="quick-access-strip page-width" id="quickAccess" aria-label="Quick access">
+    <section class="quick-access-strip page-width" id="quickAccess" aria-label="Your FoodieHub shortcuts">
       <div class="quick-access-copy">
-        <span class="drawer-kicker">QUICK ACCESS</span>
-        <h2>Need an update?</h2>
-        <p>Track a recent order or open the FoodieHub team workspace.</p>
+        <span class="drawer-kicker">YOUR FOODIEHUB</span>
+        <h2>Your orders, at a glance.</h2>
+        <p>Track a delivery or see the orders you've placed.</p>
       </div>
       <div class="quick-access-actions">
         <button class="quick-access-card quick-access-track" id="trackOrderHome" type="button">
@@ -83,9 +83,9 @@
           <span class="quick-access-label"><strong>Track an order</strong><small>Check your order status</small></span>
           <span class="quick-access-arrow" aria-hidden="true">↗</span>
         </button>
-        <button class="quick-access-card quick-access-admin" id="openAdminHome" type="button">
-          <span class="quick-access-icon" aria-hidden="true">▦</span>
-          <span class="quick-access-label"><strong>Team dashboard</strong><small>Orders &amp; performance</small></span>
+        <button class="quick-access-card quick-access-my" id="openMyDashboard" type="button">
+          <span class="quick-access-icon" aria-hidden="true">◫</span>
+          <span class="quick-access-label"><strong>My Dashboard</strong><small>Orders, spending &amp; recent activity</small></span>
           <span class="quick-access-arrow" aria-hidden="true">↗</span>
         </button>
       </div>
@@ -260,7 +260,7 @@
         <p>A little indulgence, delivered. Good food, great mood, every single time.</p>
       </div>
       <div class="footer-column"><h3>Explore</h3><a href="#menu">The menu</a><a href="#offers">Today's offers</a><a href="#about">Our story</a></div>
-      <div class="footer-column"><h3>Need a hand?</h3><button type="button" class="footer-action" id="trackOrderLink">Track an order</button><button type="button" class="footer-action" id="openAdmin">Team dashboard</button><a href="mailto:hello@foodiehub.example">Get in touch</a><span class="footer-muted">Demo ordering experience</span></div>
+      <div class="footer-column"><h3>Need a hand?</h3><button type="button" class="footer-action" id="trackOrderLink">Track an order</button><button type="button" class="footer-action footer-team-access" id="openAdmin"><span class="footer-team-icon" aria-hidden="true">▦</span><span class="footer-team-copy"><strong>Team dashboard</strong><small>Team access · Orders &amp; analytics</small></span><span class="footer-team-arrow" aria-hidden="true">↗</span></button><a href="mailto:hello@foodiehub.example">Get in touch</a><span class="footer-muted">Demo ordering experience</span></div>
       <div class="footer-newsletter">
         <h3>A little something in your inbox.</h3>
         <p>New dishes, fresh deals and good-food energy.</p>
@@ -447,6 +447,28 @@
     <div class="tracking-result" id="trackingResult" hidden></div>
   </dialog>
 
+
+  <dialog class="site-dialog my-dashboard-dialog" id="myDashboardDialog" aria-labelledby="myDashboardTitle">
+    <div class="dialog-header">
+      <div><span class="drawer-kicker">YOUR FOODIEHUB, YOUR STORY</span><h2 id="myDashboardTitle">My Dashboard.</h2></div>
+      <button class="close-button" type="button" data-close-dialog="myDashboardDialog" aria-label="Close my dashboard">×</button>
+    </div>
+    <div class="customer-dashboard-content">
+      <section class="my-dashboard-welcome">
+        <div><span class="drawer-kicker">WELCOME BACK</span><h3 id="myDashboardGreeting">Hello, foodie.</h3><p id="myDashboardIntro">Your order activity will appear here.</p></div>
+        <button class="my-dashboard-edit" id="myDashboardEditProfile" type="button">Edit profile <span aria-hidden="true">↗</span></button>
+      </section>
+      <section class="customer-dashboard-stats" aria-label="Your order summary">
+        <article><span>TOTAL ORDERS</span><strong id="myOrderCount">0</strong><small>Orders linked to your mobile</small></article>
+        <article><span>ORDER VALUE</span><strong id="myTotalValue">₹0</strong><small>Excludes cancelled orders</small></article>
+        <article><span>DELIVERED</span><strong id="myDeliveredCount">0</strong><small>Successfully delivered</small></article>
+        <article><span>AVERAGE ORDER</span><strong id="myAverageOrder">₹0</strong><small>Per active order</small></article>
+      </section>
+      <div class="my-orders-heading"><div><span class="drawer-kicker">YOUR ORDER HISTORY</span><h3>Recent orders.</h3></div><span id="myDashboardOrderRange">0 orders</span></div>
+      <div class="my-orders-list" id="myOrdersList" aria-live="polite"><div class="my-orders-empty"><span aria-hidden="true">⌁</span><h4>Your next good bite starts here.</h4><p>Your order history will show up here.</p></div></div>
+      <p class="my-dashboard-note" id="myDashboardNote">Your demo order history is matched using the mobile number saved in your profile and stays on this browser.</p>
+    </div>
+  </dialog>
 
   <dialog class="site-dialog admin-dialog" id="adminDialog" aria-labelledby="adminTitle">
     <div class="dialog-header"><div><span class="drawer-kicker">FOODIEHUB INTELLIGENCE</span><h2 id="adminTitle">Orders, in focus.</h2></div><button class="close-button" type="button" data-close-dialog="adminDialog" aria-label="Close dashboard">×</button></div>
