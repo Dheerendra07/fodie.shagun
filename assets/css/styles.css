@@ -1905,3 +1905,6 @@ h1 em,h2 em {
   .address-grid .form-field-full{grid-column:auto}
   .address-grid input,.address-grid select{min-height:47px;font-size:14px}
 }
+
+.address-legacy-note{grid-column:1/-1;margin:0;padding:10px 12px;border:1px solid var(--glass-border);border-radius:10px;background:var(--orange-soft);color:var(--ink);font-size:10px;line-height:1.55}
+.address-legacy-note[hidden]{display:none!important}

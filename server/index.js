@@ -298,12 +298,13 @@ function validateCustomer(customer) {
   const missing = requiredAddressFields.filter(field => !addressDetails[field]);
   if (missing.length) { const error = new Error("Complete the house, street, area, town, city, district and state address fields."); error.status = 400; throw error; }
   if (!/^[1-9]\d{5}$/.test(addressDetails.pincode)) { const error = new Error("Enter a valid 6-digit Indian PIN code."); error.status = 400; throw error; }
+  const places = [...new Set([addressDetails.town, addressDetails.city, addressDetails.district].filter(Boolean))];
   const address = [
     [addressDetails.house, addressDetails.building].filter(Boolean).join(", "),
     [addressDetails.street, addressDetails.area].filter(Boolean).join(", "),
-    addressDetails.landmark ? "Landmark: " + addressDetails.landmark : "",
-    [addressDetails.town, addressDetails.city].join(", "),
-    [addressDetails.district, addressDetails.state].join(", ") + " - " + addressDetails.pincode
+    addressDetails.landmark ? "Near " + addressDetails.landmark : "",
+    places.join(", "),
+    addressDetails.state + " - " + addressDetails.pincode
   ].filter(Boolean).join(", ");
   if (address.length > 500) { const error = new Error("Please shorten your delivery address."); error.status = 400; throw error; }
   return { name, phone, email, address, addressDetails };

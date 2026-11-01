@@ -162,12 +162,13 @@
   }
   function formatDeliveryAddress(details){
     const d=details||{};
+    const places=[...new Set([d.town,d.city,d.district].filter(Boolean))];
     const lines=[
       [d.house,d.building].filter(Boolean).join(", "),
       [d.street,d.area].filter(Boolean).join(", "),
-      d.landmark?("Landmark: "+d.landmark):"",
-      [d.town,d.city].filter(Boolean).join(", "),
-      [d.district,d.state].filter(Boolean).join(", ")+(d.pincode?" - "+d.pincode:"")
+      d.landmark?("Near "+d.landmark):"",
+      places.join(", "),
+      [d.state].filter(Boolean).join("")+(d.pincode?" - "+d.pincode:"")
     ].filter(Boolean);
     return lines.join(", ");
   }
@@ -177,6 +178,13 @@
       const control=form.elements.namedItem(field);
       if(control)control.value=source[field]||"";
     });
+  }
+  function showLegacyAddress(id,profile){
+    const note=$("#"+id),details=(profile&&profile.addressDetails)||{};
+    if(!note)return;
+    const hasStructured=ADDRESS_FIELDS.some(field=>String(details[field]||"").trim());
+    note.hidden=!(profile&&profile.address&&!hasStructured);
+    note.textContent=note.hidden?"":"Previously saved address: "+profile.address+". Please split it into the fields above to use it for your next order.";
   }
   function updateAddressPreview(formId,previewId){
     const form=$("#"+formId),preview=$("#"+previewId);
@@ -199,6 +207,7 @@
       form.elements.namedItem(field).value = state.profile[field] || "";
     });
     fillAddressFields(form,state.profile.addressDetails||{});
+    showLegacyAddress("profileLegacyAddress",state.profile);
     updateAddressPreview("profileForm","profileAddressPreview");
     $("#profileError").textContent = "";
     $("#profileMessage").textContent = state.profile.name || state.profile.address
@@ -643,6 +652,7 @@
       checkoutForm.elements.namedItem(field).value = state.profile[field] || "";
     });
     fillAddressFields(checkoutForm,state.profile.addressDetails||{});
+    showLegacyAddress("checkoutLegacyAddress",state.profile);
     updateAddressPreview("checkoutForm","checkoutAddressPreview");
     $("#saveCheckoutProfile").checked = true;
     renderPaymentAvailability();
@@ -1036,7 +1046,7 @@
       const number=order.order_number||order.orderNumber||"FH-UNKNOWN",name=order.customer_name||(order.customer&&order.customer.name)||"Demo customer",status=normalizeAdminStatus(order.status);
       const choices=["confirmed","preparing","out_for_delivery","delivered","cancelled"],itemCount=Array.isArray(order.items)?order.items.reduce((sum,item)=>sum+Number(item.quantity||1),0):0;
       const address=order.addressDetails||(order.customer&&order.customer.addressDetails)||{};
-      const location=[address.city,address.district,address.state].filter(Boolean).join(", ");
+      const location=[...new Set([address.city,address.district,address.state].filter(Boolean))].join(", ");
       const postal=address.pincode||"";
       return '<tr data-admin-row="'+escapeHTML(number)+'"><td><strong>'+escapeHTML(number)+'</strong><small>'+itemCount+' items</small></td><td>'+escapeHTML(name)+'<small>'+escapeHTML([location,postal].filter(Boolean).join(" · ")||"Address on file")+'</small></td><td>'+money(order.total)+'</td><td><select data-admin-status aria-label="Status for '+escapeHTML(number)+'">'+choices.map(choice=>'<option value="'+choice+'"'+(choice===status?" selected":"")+'>'+choice.replace(/_/g," ")+'</option>').join("")+'</select></td><td><button type="button" class="button button-outline admin-update-button" data-admin-update="'+escapeHTML(number)+'">Save</button></td></tr>';
     }).join("");
