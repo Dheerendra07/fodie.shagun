@@ -561,6 +561,15 @@ function completeSet(name, index, checked) {
   const checks = exerciseChecks(name);
   checks[index] = checked;
   data.setsCompleted[name] = checks;
+  let newRecord = false;
+  if (checked) {
+    const loggedWeight = Number(exerciseWeights(name)[index]);
+    const previousRecord = Number(data.personalRecords[name] || 0);
+    if (loggedWeight > 0 && loggedWeight > previousRecord) {
+      data.personalRecords[name] = loggedWeight;
+      newRecord = true;
+    }
+  }
   if (checks.every(Boolean)) {
     if (!data.completed.includes(name)) data.completed.push(name);
   } else {
@@ -572,7 +581,7 @@ function completeSet(name, index, checked) {
     startRest();
   }
   render();
-  notify(checked ? "Set completed. Rest timer started." : "Set unchecked.");
+  notify(checked ? (newRecord ? "New personal record! Rest timer started." : "Set completed. Rest timer started.") : "Set unchecked.");
 }
 function updateSetWeight(name, index, value) {
   const weights = exerciseWeights(name);
@@ -583,7 +592,7 @@ function updateSetWeight(name, index, value) {
   }
   weights[index] = numeric;
   data.setWeights[name] = weights;
-  if (numeric !== "") {
+  if (numeric !== "" && exerciseChecks(name)[index]) {
     const previous = Number(data.personalRecords[name] || 0);
     if (numeric > previous) {
       data.personalRecords[name] = numeric;
