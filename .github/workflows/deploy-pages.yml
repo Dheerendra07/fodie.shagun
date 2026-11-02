@@ -41,6 +41,7 @@ jobs:
         run: |
           set -euo pipefail
           npm run check
+          node --check fittrack/app.js
           node -e "JSON.parse(require('fs').readFileSync('data/menu.json', 'utf8'))"
 
       - name: Run backend tests
