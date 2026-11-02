@@ -29,13 +29,6 @@
             <span class="avatar" id="profile-avatar">S</span>
             <span class="profile-copy"><b id="profile-name">Your fitness space</b><small>PERSONAL PROFILE</small></span>
           </button>
-          <button class="profile-dots" id="profile-menu-toggle" type="button" aria-label="Open profile options" aria-expanded="false">•••</button>
-          <div class="profile-menu" id="profile-menu" hidden>
-            <button type="button" data-profile-action="edit">Edit profile</button>
-            <button type="button" data-profile-action="export">Export my data</button>
-            <button type="button" data-profile-action="reset">Reset app data</button>
-            <button type="button" data-profile-action="about">About FitTrack</button>
-          </div>
         </div>
       </div>
     </aside>
@@ -43,7 +36,7 @@
       <header class="topbar">
         <div class="mobile-brand"><span class="brand-mark">F</span> fittrack<span class="brand-dot">.</span></div>
         <div class="breadcrumb">Workspace <span>/</span> <b id="crumb">Dashboard</b></div>
-        <div class="top-actions"><span class="today-pill"><span class="live-dot"></span> YOUR FITNESS SPACE</span><button class="avatar small-avatar" id="open-profile-top" type="button" aria-label="Open your profile">S</button></div>
+        <div class="top-actions profile-actions"><span class="today-pill"><span class="live-dot"></span> YOUR FITNESS SPACE</span><button class="profile-dots" id="profile-menu-toggle" type="button" aria-label="Open profile options" aria-expanded="false">•••</button><div class="profile-menu" id="profile-menu" hidden><button type="button" data-profile-action="edit">Edit profile</button><button type="button" data-profile-action="export">Export my data</button><button type="button" data-profile-action="reset">Reset app data</button><button type="button" data-profile-action="about">About FitTrack</button></div><button class="avatar small-avatar" id="open-profile-top" type="button" aria-label="Open your profile">S</button></div>
       </header>
       <section id="view" class="view" aria-live="polite"></section>
       <footer>FITTRACK <span>•</span> CONSISTENCY OVER PERFECTION</footer>
