@@ -767,7 +767,7 @@ $("#profile-menu").addEventListener("click", event => {
   }
 });
 document.addEventListener("click", event => {
-  if (!event.target.closest(".profile-wrap")) closeProfileMenu();
+  if (!event.target.closest(".profile-wrap, .profile-actions")) closeProfileMenu();
 });
 document.addEventListener("keydown", event => {
   if (event.key === "Escape") {
