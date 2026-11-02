@@ -1,92 +1,133 @@
 # FoodieHub
 
-A polished, responsive food discovery and ordering website with a separate HTML, CSS and JavaScript frontend plus a Node.js/Express API.
+FoodieHub is a responsive food-ordering application with a separate HTML/CSS/JavaScript frontend and a Node.js/Express API.
 
-## Live website
+## Live frontend
 
 GitHub Pages: https://shagun299.github.io/fodie/
 
-The GitHub Pages workflow publishes the static frontend whenever a commit reaches \`main\`. GitHub Pages cannot execute the Node.js backend; use the backend instructions below for server-side orders.
+**Important:** GitHub Pages publishes static files only. It cannot run Node.js, SQLite, customer authentication or payment webhooks. The frontend remains in demo/local-browser mode until you deploy the API and configure its URL.
 
-## Frontend
+## Project layout
 
-The repository keeps the page source readable and separated:
+- \`index.html\` — page structure, sections, forms and dialogs.
+- \`assets/css/styles.css\` — responsive styling, themes and component states.
+- \`assets/js/app.js\` — menu, search, favourites, cart, customisation, checkout, order tracking and dashboards.
+- \`assets/js/config.js\` — base URL for the separately hosted API.
+- \`data/menu.json\` — starter menu catalogue.
+- \`server/index.js\` — Express application, checkout, payment verification, order tracking and analytics.
+- \`server/production.js\` — customer/admin sessions, password hashing, address book, menu management, stock, coupons, audit logs, webhooks and refunds.
+- \`tests/production.test.js\` — backend integration and security tests.
 
-- \`index.html\` — semantic page structure, sections, forms, dialogs and the dish-card template.
-- \`assets/css/styles.css\` — responsive styling, light/dark themes and component states.
-- \`assets/js/app.js\` — menu filters, search, favourites, cart, coupons, checkout, order tracking and API calls.
-- \`assets/js/config.js\` — optional URL for a separately hosted API.
-- \`data/menu.json\` — 24 sample menu items and food imagery.
+## Local development
 
-Open \`index.html\` directly or run the full-stack app locally as described below.
+Requirements: Node.js 20 or newer.
 
-## Run the full website and backend locally
-
-1. Install Node.js 20 or newer.
-2. Clone this repository.
-3. In the repository folder, run:
-
-   \`\`\`bash
-   npm install
-   npm start
-   \`\`\`
-
-4. Open http://localhost:3000
-
-The backend creates \`server/data/foodiehub.sqlite\` automatically. Orders and newsletter sign-ups are stored in that SQLite database.
-
-For live code reloading during development, run \`npm run dev\`.
-
-## API routes
-
-| Method | Route | Purpose |
-| --- | --- | --- |
-| GET | \`/api/health\` | API and database health |
-| GET | \`/api/menu\` | Menu data |
-| GET | \`/api/categories\` | Menu categories |
-| POST | \`/api/orders\` | Validate prices and save a delivery-payment order |
-| GET | \`/api/orders/track?order=...&phone=...\` | Track an order with order number and checkout phone |
-| POST | \`/api/newsletter\` | Save a newsletter email |
-| GET | \`/api/admin/orders\` | Admin order list (protected) |
-| PATCH | \`/api/admin/orders/:orderNumber\` | Update order status (protected) |
-
-### Demo offers
-
-- \`HUB50\` — 50% off eligible baskets above ₹699, up to ₹200 off.
-- \`FOOD25\` — 25% off eligible baskets above ₹299, up to ₹100 off.
-- Some menu items already show up to 50% off against their listed original price.
-
-The server recalculates item prices, coupon eligibility, delivery and tax. It does not trust totals sent by the browser.
-
-## Deploy the backend
-
-GitHub Pages is static hosting. To accept centrally stored orders, deploy this repository as a Node web service on Render, Railway or another Node.js host:
-
-- Build command: \`npm install\`
-- Start command: \`npm start\`
-- Health-check path: \`/api/health\`
-- Set \`NODE_ENV=production\`.
-- Set \`DATA_DIR\` to a persistent mounted folder, for example \`/var/data\`, when your hosting plan supports a persistent disk.
-- Set \`ALLOWED_ORIGINS\` to the exact frontend origin, for example \`https://shagun299.github.io\`.
-- Set a long random \`ADMIN_API_KEY\` before using the admin endpoints.
-- To enable online checkout, set \`RAZORPAY_KEY_ID\` and \`RAZORPAY_KEY_SECRET\` as backend environment variables. Start with Razorpay Test Mode keys; use Live Mode keys only after account and website approval.
-
-After the backend is deployed, put its base URL in \`assets/js/config.js\`:
-
-\`\`\`js
-window.FOODIEHUB_API_URL = "https://YOUR-BACKEND-HOST";
+\`\`\`bash
+npm install
+npm run check
+npm test
+npm start
 \`\`\`
 
-Commit that change and let GitHub Pages deploy again. Do not put \`ADMIN_API_KEY\`, database credentials or payment secrets in frontend files or this public repository.
+Open http://localhost:3000. SQLite is initialized automatically under \`server/data\` unless \`DATA_DIR\` is set.
 
-## Important project boundaries
+## Production deployment
 
-- If the backend is offline, the website still lets you browse, filter, favourite and build a cart. Checkout then uses a clearly identified browser-only demo order.
-- When the backend is online, orders and newsletter sign-ups are stored in SQLite on the server. Use persistent storage on the hosting provider or orders may be lost when its filesystem is reset.
-- Cash on delivery and UPI on delivery work as delivery-payment choices. Secure online checkout appears only after the separately hosted backend has Razorpay keys configured.
-- Razorpay secrets remain on the backend. The server creates the payment order, verifies the signature and checks the payment amount and order before confirming a captured payment. A GitHub Pages-only deployment cannot process online payments by itself.
-- The menu, photographs, prices, offer rules and brand copy are sample project content. Replace them with verified restaurant information before taking real customer orders.
+Use a Node.js web-service host such as Render or Railway. Do not deploy the API on GitHub Pages.
 
-## Security notes
+Suggested Render settings:
 
-The API uses Helmet security headers, CORS configuration, rate limiting, input validation, server-side price calculation and an API-key check for admin routes. For a public production launch, add HTTPS-only hosting, privacy/retention policies, monitored backups, verified payment integration and a proper admin login system.
+| Setting | Value |
+| --- | --- |
+| Runtime | Node |
+| Build command | \`npm install\` |
+| Start command | \`npm start\` |
+| Health check | \`/api/health\` |
+| Persistent disk mount | \`/var/data\` |
+| Instance count | One instance for the SQLite deployment |
+
+Add the variables from \`.env.example\` in the hosting provider's secret/environment settings. At minimum:
+
+1. \`NODE_ENV=production\`
+2. \`DATA_DIR=/var/data\` and attach a persistent disk at that exact path.
+3. \`ALLOWED_ORIGINS=https://shagun299.github.io\` (include any custom frontend domain too).
+4. \`JWT_SECRET\` as a unique random secret of at least 32 characters.
+5. \`ADMIN_EMAIL\` and \`ADMIN_PASSWORD_HASH\`. Run \`node scripts/hash-password.js\` locally to create the scrypt hash. Do not put the plain password in GitHub.
+6. Configure \`ADMIN_API_KEY\` only if you are continuing to use the existing admin-key form in the frontend.
+
+The API deliberately refuses to start in production without a strong \`JWT_SECRET\` and an explicit \`ALLOWED_ORIGINS\` list.
+
+### Connect the GitHub Pages frontend
+
+After the API service is deployed and its health URL works, edit \`assets/js/config.js\` and set the public API base URL:
+
+\`\`\`js
+window.FOODIEHUB_API_URL = "https://YOUR-API-HOST";
+\`\`\`
+
+This URL is public and is not a secret. Never place database credentials, JWT signing secrets, Razorpay secrets or admin keys in \`config.js\`. Commit the change to \`main\`; GitHub Actions will publish the updated static frontend.
+
+### Razorpay setup
+
+1. Start with Razorpay Test Mode credentials.
+2. Add \`RAZORPAY_KEY_ID\`, \`RAZORPAY_KEY_SECRET\` and \`RAZORPAY_WEBHOOK_SECRET\` as server environment variables.
+3. In the Razorpay dashboard, add the webhook URL \`https://YOUR-API-HOST/api/payments/webhook\`.
+4. Subscribe to \`payment.captured\`, \`payment.failed\` and \`order.paid\`.
+5. Test successful payments, failed payments, duplicate webhook delivery, cancellations and refunds before switching to Live Mode.
+
+The server calculates the order price, validates coupon eligibility, reserves tracked stock, creates the Razorpay order, verifies payment signatures and reconciles webhook events. Refunds are initiated from the protected admin refund endpoint.
+
+## Backend capabilities
+
+### Customer accounts
+
+- \`POST /api/auth/register\` and \`POST /api/auth/login\`
+- \`GET /api/auth/me\`, \`PATCH /api/auth/me\`, \`POST /api/auth/logout\`
+- \`GET /api/auth/orders\`
+- \`GET /api/auth/addresses\`, \`POST /api/auth/addresses\`, \`DELETE /api/auth/addresses/:id\`
+
+Passwords are hashed with Node.js scrypt. Authenticated endpoints use signed, expiring bearer sessions stored in the database. Guest checkout and phone-based order tracking remain supported.
+
+### Menu, stock and coupons
+
+- Public menu and category endpoints return only active dishes and include availability/stock metadata.
+- Admin menu APIs can add, edit, disable and archive dishes.
+- Admin inventory APIs can enable quantity tracking, update quantities and prevent checkout from overselling tracked dishes. A \`null\` quantity means stock tracking is not enabled for that dish.
+- Coupon rules live in SQLite, not only in frontend JavaScript. Admin APIs can create, edit, activate and disable coupon codes. Usage limits are claimed inside the order transaction and released for failed/cancelled orders.
+
+### Orders and payments
+
+- Server-side price, customisation, coupon, tax and delivery calculations.
+- Atomic order creation and inventory reservations.
+- Customer order history when checkout includes a valid customer bearer token.
+- Guest order tracking using order number and checkout phone.
+- Razorpay order creation and payment signature/provider verification.
+- Signed webhook verification, event de-duplication and payment failure cleanup.
+- Protected admin order status changes and Razorpay refunds.
+
+### Admin APIs
+
+The legacy \`ADMIN_API_KEY\` bearer/header access remains supported. A password-based admin session can also be created through \`POST /api/admin/auth/login\` using \`ADMIN_EMAIL\` and the scrypt \`ADMIN_PASSWORD_HASH\`.
+
+Protected endpoints include:
+
+- \`GET /api/admin/orders\`, \`GET /api/admin/orders/:orderNumber\`, \`PATCH /api/admin/orders/:orderNumber\`
+- \`POST /api/admin/orders/:orderNumber/refund\`
+- \`GET/POST/PATCH/DELETE /api/admin/menu...\`
+- \`GET/PATCH /api/admin/inventory...\`
+- \`GET/POST/PATCH/DELETE /api/admin/coupons...\`
+- \`GET /api/admin/customers\`, \`GET /api/admin/newsletter\`, \`GET /api/admin/audit-logs\`
+- \`GET /api/admin/analytics\`
+
+## Database and scaling notes
+
+The current app uses SQLite with WAL mode and foreign keys. For a small, single-instance restaurant deployment, this is suitable only when the database directory is mounted on persistent storage and backups are configured. Keep the service to one application instance; do not run multiple API replicas against the same SQLite file. For multi-instance/high-volume operation, migrate the data layer to managed PostgreSQL before scaling.
+
+Back up the persistent database regularly, test restoration, monitor health/error logs and set a retention policy for customer data. Protect the hosting account with MFA and rotate admin/JWT/payment secrets.
+
+## Production readiness boundaries
+
+The backend code and API are implemented, but a production launch still requires your hosting account, persistent disk, environment secrets, Razorpay merchant approval/webhook setup and end-to-end live tests. I cannot activate those account-side resources from a GitHub commit alone.
+
+The current website UI continues to support guest checkout and browser-local profile/dashboard behaviour. The customer authentication and account APIs are available, but a customer-facing sign-in/account interface and attaching the bearer token from the browser checkout still need a separate frontend integration pass. Email/phone verification, password reset delivery and transactional email/SMS providers are not configured yet. Do not treat the deployment as accepting real orders until those operational steps and payment tests are complete.

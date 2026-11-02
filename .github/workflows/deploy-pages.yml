@@ -28,19 +28,23 @@ jobs:
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 
-      - name: Validate JavaScript and menu data
+      - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
-      - name: Check source files
+      - name: Install API dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Check source and menu data
         shell: bash
         run: |
           set -euo pipefail
-          node --check server/index.js
-          node --check assets/js/app.js
-          node --check fittrack/app.js
+          npm run check
           node -e "JSON.parse(require('fs').readFileSync('data/menu.json', 'utf8'))"
+
+      - name: Run backend tests
+        run: npm test
 
       - name: Prepare static website
         shell: bash

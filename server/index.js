@@ -39,6 +39,7 @@ const MENU_PATH = path.join(ROOT, "data", "menu.json");
 const menu = JSON.parse(fs.readFileSync(MENU_PATH, "utf8"));
 const productById = new Map(menu.map(item => [item.id, item]));
 const allowedOrigins = (process.env.ALLOWED_ORIGINS || "").split(",").map(item => item.trim()).filter(Boolean);
+let production = null;
 
 app.disable("x-powered-by");
 app.use(helmet({
@@ -58,11 +59,16 @@ app.use(helmet({
 }));
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.length === 0 || allowedOrigins.includes(origin)) return callback(null, true);
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    if (process.env.NODE_ENV !== "production" && allowedOrigins.length === 0) return callback(null, true);
     return callback(new Error("This website origin is not allowed by the API."));
   }
 }));
-app.use(express.json({ limit: "100kb" }));
+app.use(express.json({
+  limit: "100kb",
+  verify: (req, res, buffer) => { req.rawBody = Buffer.from(buffer); }
+}));
 app.use("/api", rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 160,
@@ -78,22 +84,8 @@ function cleanPhone(value) {
   return String(value || "").replace(/\D/g, "").slice(-10);
 }
 function calculateCoupon(code, subtotal) {
-  const normalized = String(code || "").trim().toUpperCase();
-  const offers = {
-    HUB50: { percent: 50, max: 200, minimum: 699 },
-    FOOD25: { percent: 25, max: 100, minimum: 299 },
-    COMBO10: { percent: 10, max: 150, minimum: 199 },
-    REWARD25: { fixed: 25, minimum: 249 }
-  };
-  const offer = offers[normalized];
-  if (!offer) return { code: "", discount: 0 };
-  if (subtotal < offer.minimum) {
-    const error = new Error(normalized + " needs a minimum subtotal of ₹" + offer.minimum + ".");
-    error.status = 400;
-    throw error;
-  }
-  const discount = offer.fixed ? Math.min(offer.fixed, subtotal) : Math.min(round(subtotal * offer.percent / 100), offer.max);
-  return { code: normalized, discount };
+  if (production) return production.calculateCoupon(code, subtotal);
+  return { code: "", discount: 0 };
 }
 function calculateCustomization(product, input) {
   const data = input && typeof input === "object" ? input : {};
@@ -188,7 +180,7 @@ function calculateOrder(items, couponCode) {
     const productId = String(requested.productId || "");
     const quantity = Number(requested.quantity);
     const product = productById.get(productId);
-    if (!product || !Number.isInteger(quantity) || quantity < 1 || quantity > 20) {
+    if (!product || (production && !production.isProductActive(productId)) || !Number.isInteger(quantity) || quantity < 1 || quantity > 20) {
       const error = new Error("One of the selected items is unavailable or has an invalid quantity.");
       error.status = 400;
       throw error;
@@ -226,8 +218,9 @@ function calculateOrder(items, couponCode) {
 }
 function requireAdmin(req, res, next) {
   const expected = process.env.ADMIN_API_KEY;
-  if (!expected) return res.status(503).json({ error: "Admin access is disabled. Set ADMIN_API_KEY on the server." });
   const provided = String(req.get("authorization") || req.get("x-admin-key") || "").replace(/^Bearer\s+/i, "");
+  if (production && production.verifyAdminToken(provided)) return next();
+  if (!expected) return res.status(503).json({ error: "Admin access is disabled. Configure admin login or ADMIN_API_KEY on the server." });
   const expectedBuffer = Buffer.from(expected);
   const providedBuffer = Buffer.from(provided);
   if (expectedBuffer.length !== providedBuffer.length || !crypto.timingSafeEqual(expectedBuffer, providedBuffer)) {
@@ -250,12 +243,15 @@ function publicOrder(row) {
   };
 }
 
+production = require("./production")({ app, db, menu, productById, requireAdmin, razorpayRequest });
+
 app.get("/api/health", (req, res) => {
   res.json({ ok: true, service: "FoodieHub API", menuItems: menu.length, database: "connected", time: new Date().toISOString() });
 });
 
 app.get("/api/categories", (req, res) => {
-  const categories = [...new Set(menu.map(item => item.category))];
+  const visible = menu.filter(item => production.isProductActive(item.id));
+  const categories = [...new Set(visible.map(item => item.category))];
   res.json({ categories });
 });
 
@@ -263,11 +259,16 @@ app.get("/api/menu", (req, res) => {
   const query = String(req.query.q || "").trim().toLowerCase();
   const category = String(req.query.category || "All");
   const diet = String(req.query.diet || "all");
-  let items = menu.filter(item => {
+  const inventory = new Map(db.prepare("SELECT product_id, quantity FROM inventory").all().map(row => [row.product_id, row.quantity]));
+  const items = menu.filter(item => {
+    const matchesActive = production.isProductActive(item.id);
     const matchesCategory = category === "All" || item.category === category;
     const matchesDiet = diet === "all" || (diet === "veg" ? item.isVeg : !item.isVeg);
     const searchable = [item.name, item.description, item.category, ...(item.tags || [])].join(" ").toLowerCase();
-    return matchesCategory && matchesDiet && (!query || searchable.includes(query));
+    return matchesActive && matchesCategory && matchesDiet && (!query || searchable.includes(query));
+  }).map(item => {
+    const quantity = inventory.has(item.id) ? inventory.get(item.id) : null;
+    return { ...item, stockQuantity: quantity, available: quantity === null || quantity > 0 };
   });
   res.json({ count: items.length, items });
 });
@@ -350,14 +351,20 @@ app.post("/api/payments/create-order", async (req, res, next) => {
       error.status = 502;
       throw error;
     }
-    db.prepare([
-      "INSERT INTO orders (order_number, customer_name, phone, email, address, address_json, items_json, subtotal, coupon_code, coupon_discount, delivery_fee, tax, total, payment_method, payment_status, status, created_at, gateway_order_id)",
-      "VALUES (@orderNumber, @name, @phone, @email, @address, @addressJson, @itemsJson, @subtotal, @couponCode, @couponDiscount, @deliveryFee, @tax, @total, 'razorpay', 'created', 'payment_pending', @createdAt, @gatewayOrderId)"
-    ].join(" ")).run({
-      orderNumber, ...customer, addressJson: JSON.stringify(customer.addressDetails), itemsJson: JSON.stringify(bill.items), subtotal: bill.subtotal,
-      couponCode: bill.couponCode, couponDiscount: bill.couponDiscount, deliveryFee: bill.deliveryFee,
-      tax: bill.tax, total: bill.total, createdAt, gatewayOrderId: gatewayOrder.id
+    const insertPendingOrder = db.prepare([
+      "INSERT INTO orders (order_number, customer_name, phone, email, address, address_json, items_json, subtotal, coupon_code, coupon_discount, delivery_fee, tax, total, payment_method, payment_status, status, created_at, gateway_order_id, user_id)",
+      "VALUES (@orderNumber, @name, @phone, @email, @address, @addressJson, @itemsJson, @subtotal, @couponCode, @couponDiscount, @deliveryFee, @tax, @total, 'razorpay', 'created', 'payment_pending', @createdAt, @gatewayOrderId, @userId)"
+    ].join(" "));
+    const savePendingOrder = db.transaction(() => {
+      production.reserveInventory(orderNumber, bill.items, 20);
+      insertPendingOrder.run({
+        orderNumber, ...customer, addressJson: JSON.stringify(customer.addressDetails), itemsJson: JSON.stringify(bill.items), subtotal: bill.subtotal,
+        couponCode: bill.couponCode, couponDiscount: bill.couponDiscount, deliveryFee: bill.deliveryFee,
+        tax: bill.tax, total: bill.total, createdAt, gatewayOrderId: gatewayOrder.id, userId: req.user ? req.user.id : null
+      });
+      production.claimCoupon(bill.couponCode, orderNumber);
     });
+    savePendingOrder();
     return res.status(201).json({
       keyId: process.env.RAZORPAY_KEY_ID, razorpayOrderId: gatewayOrder.id,
       orderNumber, amount: gatewayOrder.amount, currency: gatewayOrder.currency || "INR", total: bill.total
@@ -373,7 +380,7 @@ app.post("/api/payments/verify", async (req, res, next) => {
     const paymentId = String(body.razorpay_payment_id || "").trim();
     const signature = String(body.razorpay_signature || "").trim();
     if (!orderId || !paymentId || !/^[a-f0-9]{64}$/i.test(signature)) return res.status(400).json({ error: "The payment confirmation details are incomplete." });
-    const row = db.prepare("SELECT order_number, gateway_order_id, total, payment_status FROM orders WHERE gateway_order_id = ?").get(orderId);
+    const row = db.prepare("SELECT order_number, gateway_order_id, total, payment_status, status FROM orders WHERE gateway_order_id = ?").get(orderId);
     if (!row) return res.status(404).json({ error: "The FoodieHub order for this payment could not be found." });
     if (row.payment_status === "paid") return res.json({
       orderNumber: row.order_number, status: "confirmed", total: row.total, paymentStatus: "paid",
@@ -390,6 +397,33 @@ app.post("/api/payments/verify", async (req, res, next) => {
     if (payment.order_id !== row.gateway_order_id || Number(payment.amount) !== Math.round(Number(row.total) * 100)) {
       return res.status(400).json({ error: "The payment amount or order does not match this FoodieHub order." });
     }
+    if (payment.status === "failed") {
+      const failPayment = db.transaction(() => {
+        db.prepare("UPDATE orders SET payment_status = 'failed', status = 'failed' WHERE order_number = ?").run(row.order_number);
+        production.releaseInventory(row.order_number);
+        production.releaseCoupon(row.order_number);
+      });
+      failPayment();
+      return res.status(409).json({ error: "The payment failed. Your reserved items have been released. Please try checkout again." });
+    }
+    if (["failed", "cancelled"].includes(row.status)) {
+      if (payment.status === "captured" || payment.captured === true) {
+        try {
+          await razorpayRequest("/payments/" + encodeURIComponent(paymentId) + "/refund", {
+            method: "POST",
+            body: { amount: Math.round(Number(row.total) * 100), notes: { foodiehub_order_number: row.order_number, reason: "The order reservation expired or was cancelled." } }
+          });
+          db.prepare("UPDATE orders SET payment_status = 'refunded', status = 'cancelled', razorpay_payment_id = ? WHERE order_number = ?").run(paymentId, row.order_number);
+          production.audit("system", "payment.late_capture_refunded", "order", row.order_number);
+          return res.status(409).json({ error: "The order reservation expired. The captured payment has been sent for refund; please do not retry this checkout." });
+        } catch (refundError) {
+          db.prepare("UPDATE orders SET payment_status = 'refund_required', razorpay_payment_id = ? WHERE order_number = ?").run(paymentId, row.order_number);
+          production.audit("system", "payment.refund_required", "order", row.order_number, { message: refundError.message });
+          return res.status(409).json({ error: "This payment was captured after the order expired and needs support review. Do not retry the payment." });
+        }
+      }
+      return res.status(409).json({ error: "This order has expired or was cancelled. Please start a new checkout." });
+    }
     if (payment.status === "authorized" && !payment.captured) {
       payment = await razorpayRequest("/payments/" + encodeURIComponent(paymentId) + "/capture", {
         method: "POST", body: { amount: Math.round(Number(row.total) * 100), currency: "INR" }
@@ -398,7 +432,11 @@ app.post("/api/payments/verify", async (req, res, next) => {
     if (payment.status !== "captured" && payment.captured !== true) {
       return res.status(409).json({ error: "Payment is authorised but not captured yet. The order is still pending; contact support before retrying." });
     }
-    db.prepare("UPDATE orders SET payment_status = 'paid', status = 'confirmed' WHERE order_number = ?").run(row.order_number);
+    const confirmPayment = db.transaction(() => {
+      db.prepare("UPDATE orders SET payment_status = 'paid', status = 'confirmed', razorpay_payment_id = ? WHERE order_number = ?").run(paymentId, row.order_number);
+      production.consumeInventory(row.order_number);
+    });
+    confirmPayment();
     return res.json({
       orderNumber: row.order_number, status: "confirmed", total: row.total, paymentStatus: "paid",
       paymentMethod: "razorpay", message: "Payment captured and verified securely. Your order is confirmed."
@@ -421,21 +459,22 @@ app.post("/api/orders", (req, res, next) => {
     const bill = calculateOrder(body.items, body.couponCode);
     const orderNumber = createOrderNumber();
     const createdAt = new Date().toISOString();
-    db.prepare([
-      "INSERT INTO orders (order_number, customer_name, phone, email, address, address_json, items_json, subtotal, coupon_code, coupon_discount, delivery_fee, tax, total, payment_method, payment_status, status, created_at)",
-      "VALUES (@orderNumber, @name, @phone, @email, @address, @addressJson, @itemsJson, @subtotal, @couponCode, @couponDiscount, @deliveryFee, @tax, @total, @paymentMethod, 'pending', 'confirmed', @createdAt)"
-    ].join(" ")).run({
-      orderNumber, name, phone, email, address, addressJson: JSON.stringify(customer.addressDetails),
-      itemsJson: JSON.stringify(bill.items),
-      subtotal: bill.subtotal,
-      couponCode: bill.couponCode,
-      couponDiscount: bill.couponDiscount,
-      deliveryFee: bill.deliveryFee,
-      tax: bill.tax,
-      total: bill.total,
-      paymentMethod,
-      createdAt
+    const insertDeliveryOrder = db.prepare([
+      "INSERT INTO orders (order_number, customer_name, phone, email, address, address_json, items_json, subtotal, coupon_code, coupon_discount, delivery_fee, tax, total, payment_method, payment_status, status, created_at, user_id)",
+      "VALUES (@orderNumber, @name, @phone, @email, @address, @addressJson, @itemsJson, @subtotal, @couponCode, @couponDiscount, @deliveryFee, @tax, @total, @paymentMethod, 'pending', 'confirmed', @createdAt, @userId)"
+    ].join(" "));
+    const saveDeliveryOrder = db.transaction(() => {
+      production.reserveInventory(orderNumber, bill.items, null);
+      insertDeliveryOrder.run({
+        orderNumber, name, phone, email, address, addressJson: JSON.stringify(customer.addressDetails),
+        itemsJson: JSON.stringify(bill.items), subtotal: bill.subtotal, couponCode: bill.couponCode,
+        couponDiscount: bill.couponDiscount, deliveryFee: bill.deliveryFee, tax: bill.tax, total: bill.total,
+        paymentMethod, createdAt, userId: req.user ? req.user.id : null
+      });
+      production.claimCoupon(bill.couponCode, orderNumber);
+      production.consumeInventory(orderNumber);
     });
+    saveDeliveryOrder();
     res.status(201).json({
       ...publicOrder({ order_number: orderNumber, status: "confirmed", total: bill.total, payment_method: paymentMethod, payment_status: "pending", created_at: createdAt }),
       items: bill.items,
@@ -525,10 +564,25 @@ app.get("/api/admin/analytics", requireAdmin, (req, res) => {
 app.patch("/api/admin/orders/:orderNumber", requireAdmin, (req, res) => {
   const allowedStatuses = ["confirmed", "preparing", "out_for_delivery", "delivered", "cancelled"];
   const status = String((req.body || {}).status || "");
+  const orderNumber = String(req.params.orderNumber || "").toUpperCase();
   if (!allowedStatuses.includes(status)) return res.status(400).json({ error: "That order status is not supported." });
-  const result = db.prepare("UPDATE orders SET status = ? WHERE order_number = ?").run(status, String(req.params.orderNumber).toUpperCase());
-  if (!result.changes) return res.status(404).json({ error: "Order not found." });
-  return res.json({ ok: true, orderNumber: String(req.params.orderNumber).toUpperCase(), status });
+  const existing = db.prepare("SELECT status, payment_status FROM orders WHERE order_number = ?").get(orderNumber);
+  if (!existing) return res.status(404).json({ error: "Order not found." });
+  if (existing.status === "delivered" || existing.status === "cancelled") return res.status(409).json({ error: "This order has already reached a final status." });
+  if (status === "cancelled" && existing.payment_status === "paid") return res.status(409).json({ error: "This order has a captured online payment. Use the refund action instead of direct cancellation." });
+  if (status === "cancelled" && ["preparing", "out_for_delivery"].includes(existing.status)) {
+    return res.status(409).json({ error: "This order cannot be cancelled after kitchen preparation or dispatch has started." });
+  }
+  const updateOrder = db.transaction(() => {
+    db.prepare("UPDATE orders SET status = ? WHERE order_number = ?").run(status, orderNumber);
+    if (status === "cancelled") {
+      production.releaseInventory(orderNumber);
+      production.releaseCoupon(orderNumber);
+    }
+  });
+  updateOrder();
+  production.audit("admin", "order.status_changed", "order", orderNumber, { from: existing.status, to: status });
+  return res.json({ ok: true, orderNumber, status });
 });
 
 app.post("/api/newsletter", (req, res) => {
@@ -575,7 +629,17 @@ app.use((error, req, res, next) => {
 });
 
 const port = Number(process.env.PORT || 3000);
-app.listen(port, () => {
+if (process.env.NODE_ENV === "production" && !process.env.RAZORPAY_WEBHOOK_SECRET) {
+  console.warn("RAZORPAY_WEBHOOK_SECRET is not set. Razorpay webhook-based payment reconciliation is disabled.");
+}
+if (process.env.NODE_ENV === "production" && !process.env.ADMIN_EMAIL && !process.env.ADMIN_API_KEY) {
+  console.warn("Configure ADMIN_EMAIL + ADMIN_PASSWORD_HASH or ADMIN_API_KEY before using admin routes.");
+}
+if (process.env.NODE_ENV === "production") app.set("trust proxy", 1);
+const server = app.listen(port, () => {
   console.log("FoodieHub API and website listening on port " + port);
   console.log("Database: " + path.join(DATA_DIR, "foodiehub.sqlite"));
 });
+server.requestTimeout = 30000;
+server.headersTimeout = 35000;
+server.keepAliveTimeout = 5000;
