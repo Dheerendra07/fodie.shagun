@@ -212,3 +212,6 @@ footer span{color:var(--lime);padding:0 5px}
  .profile-menu{bottom:auto;top:42px;right:0}.profile-modal{padding:17px}
 }
 @media(max-width:390px){.metrics{grid-template-columns:1fr 1fr}.metric-value{font-size:20px}.set-row{grid-template-columns:15px 40px minmax(40px,1fr) 78px;gap:5px;padding:7px 6px}.weight-field input{padding:5px 3px}.timer-controls button{padding:7px}.timer-clock{font-size:17px}}
+
+.profile-actions{position:relative}.profile-actions .profile-menu{bottom:auto;top:39px;right:0}
+@media(max-width:760px){.profile-actions{gap:7px}.profile-actions .profile-menu{top:39px;right:0}.profile-dots{display:grid;place-items:center}}
