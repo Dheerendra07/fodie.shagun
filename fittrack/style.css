@@ -215,3 +215,8 @@ footer span{color:var(--lime);padding:0 5px}
 
 .profile-actions{position:relative}.profile-actions .profile-menu{bottom:auto;top:39px;right:0}
 @media(max-width:760px){.profile-actions{gap:7px}.profile-actions .profile-menu{top:39px;right:0}.profile-dots{display:grid;place-items:center}}
+
+.weight-chart{background:#111811;border:1px solid #2b352c;border-radius:11px;padding:12px;margin-bottom:10px}
+.weight-chart svg{display:block;width:100%;height:auto;overflow:visible}
+.weight-chart-labels{display:flex;align-items:center;justify-content:space-between;gap:8px;color:var(--muted);font-size:8px;margin-top:4px}
+.weight-chart-labels b{color:#dce8d4;font-size:9px}
