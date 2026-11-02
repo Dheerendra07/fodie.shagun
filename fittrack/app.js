@@ -411,8 +411,27 @@ function weeklyProgressBars() {
 }
 function weightHistoryMarkup() {
   if (!data.weightHistory.length) return '<div class="empty">Save a weight check-in to start your weight trend.</div>';
-  return data.weightHistory.slice(-6).reverse().map(item => '<div class="history-item"><div><b>' + shortDate(item.date) +
+  const points = data.weightHistory.slice(-7);
+  const values = points.map(item => Number(item.weight));
+  const low = Math.min(...values);
+  const high = Math.max(...values);
+  const range = Math.max(1, high - low);
+  const coordinates = points.map((item, index) => {
+    const x = points.length === 1 ? 150 : 20 + index * (260 / (points.length - 1));
+    const y = 78 - ((Number(item.weight) - low) / range) * 54;
+    return { x, y, weight: Number(item.weight), date: item.date };
+  });
+  const polyline = coordinates.map(point => point.x + "," + point.y).join(" ");
+  const svg = '<div class="weight-chart"><svg viewBox="0 0 300 105" role="img" aria-label="Weight trend chart">' +
+    '<line x1="12" y1="80" x2="288" y2="80" stroke="#344034" stroke-width="1"/>' +
+    '<polyline points="' + polyline + '" fill="none" stroke="#c4f36a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>' +
+    coordinates.map(point => '<circle cx="' + point.x + '" cy="' + point.y + '" r="4" fill="#c4f36a" stroke="#172018" stroke-width="2"><title>' +
+      point.weight + ' kg on ' + shortDate(point.date) + '</title></circle>').join("") + '</svg>' +
+    '<div class="weight-chart-labels"><span>' + shortDate(points[0].date) + '</span><b>' + low + '–' + high + ' kg</b><span>' +
+    shortDate(points[points.length - 1].date) + '</span></div></div>';
+  const list = points.slice().reverse().slice(0, 5).map(item => '<div class="history-item"><div><b>' + shortDate(item.date) +
     '</b><small>Weight check-in</small></div><strong>' + item.weight + ' kg</strong></div>').join("");
+  return svg + '<div class="history-list">' + list + '</div>';
 }
 function workoutHistoryMarkup() {
   if (!data.workoutHistory.length) return '<div class="empty">Your completed sessions will appear here.</div>';
