@@ -10,6 +10,8 @@ GitHub Pages: https://shagun299.github.io/fodie/
 
 ## Project layout
 
+- `fit check/` — standalone FitTrack application (`index.html`, `style.css`, `app.js`).
+
 - \`index.html\` — page structure, sections, forms and dialogs.
 - \`assets/css/styles.css\` — responsive styling, themes and component states.
 - \`assets/js/app.js\` — menu, search, favourites, cart, customisation, checkout, order tracking and dashboards.
