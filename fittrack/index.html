@@ -4,8 +4,8 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#101510">
-  <title>FitTrack | Fitness, made personal</title>
-  <meta name="description" content="A personal fitness dashboard to track workouts, nutrition, hydration and progress.">
+  <title>FitTrack | Your fitness dashboard</title>
+  <meta name="description" content="A simple personal fitness dashboard for workouts, nutrition and progress.">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
@@ -14,21 +14,20 @@
 <body>
   <div class="app-shell">
     <aside class="sidebar">
-      <a class="brand" href="#" aria-label="FitTrack home"><span class="brand-mark">F</span><span>fittrack<span class="brand-dot">.</span><small>YOUR PERSONAL FITNESS OS</small></span></a>
-      <div class="nav-label">WORKSPACE</div>
-      <nav id="main-nav" class="main-nav">
-        <button class="nav-item active" data-view="overview"><span>◫</span> Overview</button>
-        <button class="nav-item" data-view="workouts"><span>↗</span> Workouts</button>
+      <a class="brand" href="#" aria-label="FitTrack dashboard"><span class="brand-mark">F</span><span>fittrack<span class="brand-dot">.</span><small>PERSONAL FITNESS</small></span></a>
+      <div class="nav-label">MENU</div>
+      <nav id="main-nav" class="main-nav" aria-label="Main navigation">
+        <button class="nav-item active" data-view="overview"><span>⌂</span> Dashboard</button>
+        <button class="nav-item" data-view="workouts"><span>↗</span> Workout</button>
         <button class="nav-item" data-view="nutrition"><span>◉</span> Nutrition</button>
-        <button class="nav-item" data-view="hydration"><span>♧</span> Hydration</button>
         <button class="nav-item" data-view="progress"><span>⌁</span> Progress</button>
       </nav>
       <div class="sidebar-bottom">
-        <div class="coach-card"><div class="coach-icon">✳</div><b>Consistency wins.</b><p>Show up for yourself today. The results will follow.</p><div class="coach-line"><span></span></div><small>YOUR DAILY REMINDER</small></div>
+        <div class="sidebar-note"><span class="note-icon">✳</span><b>Keep showing up.</b><p>Progress is built one session at a time.</p></div>
         <div class="profile-wrap">
           <button class="profile profile-open" id="open-profile" type="button" aria-label="Open your profile">
             <span class="avatar" id="profile-avatar">S</span>
-            <span class="profile-copy"><b id="profile-name">Your fitness space</b><small>PERSONAL DASHBOARD</small></span>
+            <span class="profile-copy"><b id="profile-name">Your fitness space</b><small>PERSONAL PROFILE</small></span>
           </button>
           <button class="profile-dots" id="profile-menu-toggle" type="button" aria-label="Open profile options" aria-expanded="false">•••</button>
           <div class="profile-menu" id="profile-menu" hidden>
@@ -41,17 +40,27 @@
       </div>
     </aside>
     <main class="main-area">
-      <header class="topbar"><div class="mobile-brand"><span class="brand-mark">F</span> fittrack<span class="brand-dot">.</span></div><div class="breadcrumb">Workspace <span>/</span> <b id="crumb">Overview</b></div><div class="top-actions"><span class="today-pill"><span class="live-dot"></span> YOUR DAILY CHECK-IN</span><button id="reset-demo" class="icon-btn" title="Reset demo data" aria-label="Reset demo data">↻</button><button class="avatar small-avatar" id="open-profile-top" type="button" aria-label="Open your profile">S</button></div></header>
+      <header class="topbar">
+        <div class="mobile-brand"><span class="brand-mark">F</span> fittrack<span class="brand-dot">.</span></div>
+        <div class="breadcrumb">Workspace <span>/</span> <b id="crumb">Dashboard</b></div>
+        <div class="top-actions"><span class="today-pill"><span class="live-dot"></span> YOUR FITNESS SPACE</span><button class="avatar small-avatar" id="open-profile-top" type="button" aria-label="Open your profile">S</button></div>
+      </header>
       <section id="view" class="view" aria-live="polite"></section>
-      <footer>FITTRACK <span>•</span> BUILT FOR PROGRESS, NOT PERFECTION</footer>
+      <footer>FITTRACK <span>•</span> CONSISTENCY OVER PERFECTION</footer>
     </main>
   </div>
+  <nav class="mobile-nav" id="mobile-nav" aria-label="Mobile navigation">
+    <button class="mobile-nav-item active" data-view="overview"><span>⌂</span><small>Home</small></button>
+    <button class="mobile-nav-item" data-view="workouts"><span>↗</span><small>Workout</small></button>
+    <button class="mobile-nav-item" data-view="nutrition"><span>◉</span><small>Nutrition</small></button>
+    <button class="mobile-nav-item" data-view="progress"><span>⌁</span><small>Progress</small></button>
+  </nav>
   <div id="profile-modal" class="modal-backdrop" hidden>
     <section class="profile-modal" role="dialog" aria-modal="true" aria-labelledby="profile-modal-title">
       <div class="modal-head"><div><div class="eyebrow">YOUR SPACE</div><h2 id="profile-modal-title">Your profile</h2></div><button type="button" class="modal-close" id="close-profile" aria-label="Close profile">×</button></div>
       <form id="profile-form">
         <div class="field"><label for="profile-display-name">DISPLAY NAME</label><input id="profile-display-name" name="displayName" maxlength="32" required placeholder="Your name"></div>
-        <div class="profile-summary"><span class="avatar" id="profile-modal-avatar">S</span><div><b id="profile-modal-preview">Your fitness space</b><small>Your profile is stored only in this browser.</small></div></div>
+        <div class="profile-summary"><span class="avatar" id="profile-modal-avatar">S</span><div><b id="profile-modal-preview">Your fitness space</b><small>Saved in this browser.</small></div></div>
         <div class="form-actions"><button class="primary-btn" type="submit">Save profile</button><button class="ghost-btn" id="cancel-profile" type="button">Cancel</button></div>
       </form>
     </section>
