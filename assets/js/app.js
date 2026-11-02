@@ -833,50 +833,118 @@
     }
   }
 
-  function openTracking(preselectedOrderNumber="") {
+  function normalizeOrderNumber(order) {
+    if (typeof order === "string") return order.trim().toUpperCase();
+    return String(order && (order.orderNumber || order.order_number || order.number) || "").trim().toUpperCase();
+  }
+
+  function normalizeOrderPhone(order) {
+    const raw = order && (order.phone || (order.customer && order.customer.phone));
+    return String(raw || "").replace(/\D/g, "").slice(-10);
+  }
+
+  function findLocalOrder(orderNumber, phone) {
+    const requestedNumber = String(orderNumber || "").trim().toUpperCase();
+    const requestedPhone = String(phone || "").replace(/\D/g, "").slice(-10);
+    return state.orders.find(item =>
+      normalizeOrderNumber(item) === requestedNumber &&
+      normalizeOrderPhone(item) === requestedPhone
+    );
+  }
+
+  function openTracking(preselectedOrderNumber = "") {
     closeCart();
-    const form=$("#trackingForm");
+    const form = $("#trackingForm");
     form.reset();
-    $("#trackingError").textContent="";
-    $("#trackingResult").hidden=true;
-    const phone=String(state.profile.phone||"").replace(/\D/g,"").slice(-10);
-    form.elements.namedItem("phone").value=phone;
-    $("#trackingHelper").textContent=phone
-      ?"Mobile number filled from your profile. Check that it matches the number used when placing the order."
-      :"Save your checkout mobile in Profile, or enter it below to verify your order.";
-    const matches=phone?state.orders.filter(order=>String(order.phone||(order.customer&&order.customer.phone)||"").replace(/\D/g,"").slice(-10)===phone).slice().sort((a,b)=>new Date(b.createdAt||b.created_at||0)-new Date(a.createdAt||a.created_at||0)).slice(0,6):[];
-    const select=$("#trackingRecentSelect");
-    select.innerHTML='<option value="">Choose an order (optional)</option>'+matches.map(order=>{
-      const number=String(order.orderNumber||order.order_number||"");
-      const date=customerOrderDate(order);
-      return '<option value="'+escapeHTML(number)+'">'+escapeHTML(number+' · '+date+' · '+money(order.total||0))+'</option>';
+    $("#trackingError").textContent = "";
+    $("#trackingResult").hidden = true;
+
+    const phone = normalizeOrderPhone({ phone: state.profile.phone });
+    form.elements.namedItem("phone").value = phone;
+    $("#trackingHelper").textContent = phone
+      ? "Mobile number filled from your profile. It must match the number used at checkout."
+      : "Enter the mobile number used at checkout, or save it in your Profile first.";
+
+    const matches = phone
+      ? state.orders
+          .filter(order => normalizeOrderPhone(order) === phone && normalizeOrderNumber(order))
+          .slice()
+          .sort((a, b) => new Date(b.createdAt || b.created_at || 0) - new Date(a.createdAt || a.created_at || 0))
+          .slice(0, 6)
+      : [];
+
+    const select = $("#trackingRecentSelect");
+    select.innerHTML = '<option value="">Choose an order (optional)</option>' + matches.map(order => {
+      const number = normalizeOrderNumber(order);
+      const date = customerOrderDate(order);
+      return '<option value="' + escapeHTML(number) + '">' +
+        escapeHTML(number + " · " + date + " · " + money(order.total || 0)) +
+        '</option>';
     }).join("");
-    $("#trackingRecentWrap").hidden=!matches.length;
-    if(preselectedOrderNumber){
-      form.elements.namedItem("orderNumber").value=preselectedOrderNumber;
-      select.value=preselectedOrderNumber;
-    }else if(matches.length){
-      $("#trackingHelper").textContent="Choose one of your recent orders above, or enter the order number from your confirmation.";
+    $("#trackingRecentWrap").hidden = !matches.length;
+
+    if (preselectedOrderNumber) {
+      form.elements.namedItem("orderNumber").value = String(preselectedOrderNumber).trim().toUpperCase();
+      select.value = String(preselectedOrderNumber).trim().toUpperCase();
+    } else if (matches.length) {
+      $("#trackingHelper").textContent = "Choose a recent order above, or type the order number from your confirmation.";
     }
     openDialog("trackingDialog");
   }
 
   async function trackOrder(event) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
     const orderNumber = String(form.get("orderNumber") || "").trim().toUpperCase();
     const phone = String(form.get("phone") || "").replace(/\D/g, "").slice(-10);
-    $("#trackingError").textContent = "";
-    $("#trackingResult").hidden = true;
+    const error = $("#trackingError");
+    const result = $("#trackingResult");
+    const submit = formElement.querySelector('button[type="submit"]');
+
+    error.textContent = "";
+    result.hidden = true;
+
+    if (!orderNumber) {
+      error.textContent = "Choose a recent order or enter your order number.";
+      formElement.elements.namedItem("orderNumber").focus();
+      return;
+    }
+    if (!/^[6-9]\d{9}$/.test(phone)) {
+      error.textContent = "Enter the same valid 10-digit mobile number used at checkout.";
+      formElement.elements.namedItem("phone").focus();
+      return;
+    }
+
+    submit.disabled = true;
+    submit.textContent = "Finding your order…";
     try {
-      let order;
+      let order = null;
+      let apiError = null;
+
       if (state.backendOnline) {
-        order = await request("/api/orders/track?order=" + encodeURIComponent(orderNumber) + "&phone=" + encodeURIComponent(phone));
+        try {
+          order = await request(
+            "/api/orders/track?order=" + encodeURIComponent(orderNumber) +
+            "&phone=" + encodeURIComponent(phone)
+          );
+        } catch (errorFromApi) {
+          apiError = errorFromApi;
+          order = findLocalOrder(orderNumber, phone);
+          if (!order) throw apiError;
+        }
       } else {
-        order = state.orders.find(item => item.orderNumber.toUpperCase() === orderNumber && item.phone === phone);
-        if (!order) throw new Error("No matching demo order was found on this device.");
+        order = findLocalOrder(orderNumber, phone);
       }
-      const result = $("#trackingResult");
+
+      if (order && order.order) order = order.order;
+      if (!order) {
+        throw new Error(state.backendOnline
+          ? "No order matched those details. Check the order number and checkout mobile."
+          : "This order is not saved on this browser. Try the same browser and device used to place it.");
+      }
+
+      const canonicalNumber = normalizeOrderNumber(order) || orderNumber;
       const rawStatus = String(order.status || "confirmed").toLowerCase();
       const stages = [
         { key: "confirmed", label: "Order placed", detail: "We've received your order." },
@@ -889,13 +957,35 @@
       const stageMarkup = stages.map((stage, index) => {
         const complete = !isCancelled && currentStage >= index;
         const active = !isCancelled && currentStage === index;
-        return '<li class="tracking-step ' + (complete ? "is-complete " : "") + (active ? "is-current" : "") + '"><span class="tracking-step-mark">' + (complete ? "✓" : String(index + 1)) + '</span><span><strong>' + stage.label + '</strong><small>' + stage.detail + '</small></span></li>';
+        return '<li class="tracking-step ' + (complete ? "is-complete " : "") +
+          (active ? "is-current" : "") + '"><span class="tracking-step-mark">' +
+          (complete ? "✓" : String(index + 1)) + '</span><span><strong>' +
+          stage.label + '</strong><small>' + stage.detail + '</small></span></li>';
       }).join("");
-      const statusLabel = isCancelled ? "Order cancelled" : (rawStatus === "demo_saved" ? "Demo order received" : (stages[Math.max(0, currentStage)] || stages[0]).label);
-      result.innerHTML = '<span class="tracking-status-dot' + (isCancelled ? ' is-cancelled' : '') + '"></span><span class="drawer-kicker">ORDER ' + escapeHTML(order.orderNumber) + '</span><h3>' + escapeHTML(statusLabel) + '</h3><p>' + escapeHTML(order.message || "Your order details are up to date.") + '</p>' + (isCancelled ? '<p class="tracking-cancelled">This order was cancelled. Please contact the team if you need help.</p>' : '<ol class="tracking-steps">' + stageMarkup + '</ol>') + '<div class="tracking-total"><span>Order total</span><strong>' + money(order.total) + '</strong></div>';
+      const statusLabel = isCancelled
+        ? "Order cancelled"
+        : (rawStatus === "demo_saved"
+          ? "Demo order received"
+          : (stages[Math.max(0, currentStage)] || stages[0]).label);
+      const total = Number(order.total || 0);
+
+      result.innerHTML =
+        '<span class="tracking-status-dot' + (isCancelled ? ' is-cancelled' : '') + '"></span>' +
+        '<span class="drawer-kicker">ORDER ' + escapeHTML(canonicalNumber) + '</span>' +
+        '<h3>' + escapeHTML(statusLabel) + '</h3>' +
+        '<p>' + escapeHTML(order.message || "Your order details are up to date.") + '</p>' +
+        (isCancelled
+          ? '<p class="tracking-cancelled">This order was cancelled. Please contact the team if you need help.</p>'
+          : '<ol class="tracking-steps">' + stageMarkup + '</ol>') +
+        '<div class="tracking-total"><span>Order total</span><strong>' + money(total) + '</strong></div>';
       result.hidden = false;
-    } catch (error) {
-      $("#trackingError").textContent = error.message || "We couldn't find that order.";
+    } catch (trackingError) {
+      error.textContent = trackingError && trackingError.message
+        ? trackingError.message
+        : "We couldn't find that order. Please check the details and try again.";
+    } finally {
+      submit.disabled = false;
+      submit.innerHTML = 'Show my order status <span aria-hidden="true">→</span>';
     }
   }
 
@@ -1336,12 +1426,15 @@
       }
     });
     $("#trackingForm").addEventListener("submit", trackOrder);
-    $("#trackingRecentSelect").addEventListener("change",event=>{
-      const selected=event.currentTarget.value;
-      if(!selected)return;
-      $("#trackingForm").elements.namedItem("orderNumber").value=selected;
-      $("#trackingForm").elements.namedItem("phone").value=String(state.profile.phone||"");
-      $("#trackingError").textContent="";
+    $("#trackingRecentSelect").addEventListener("change", event => {
+      const selected = String(event.currentTarget.value || "").trim().toUpperCase();
+      if (!selected) return;
+      const order = state.orders.find(item => normalizeOrderNumber(item) === selected);
+      $("#trackingForm").elements.namedItem("orderNumber").value = selected;
+      $("#trackingForm").elements.namedItem("phone").value =
+        normalizeOrderPhone(order) || normalizeOrderPhone({ phone: state.profile.phone });
+      $("#trackingError").textContent = "";
+      $("#trackingResult").hidden = true;
     });
     $("#trackOrderHome").addEventListener("click", openTracking);
     $("#customisePlateShortcut").addEventListener("click",()=>{
