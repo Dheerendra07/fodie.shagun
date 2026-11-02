@@ -628,14 +628,35 @@
     renderCart();
   }
 
+  function updatePaymentButtonLabel(method) {
+    const button = $(".place-order-button");
+    if (!button) return;
+    const labels = {
+      razorpay: "Continue to secure payment →",
+      cod: "Place COD order →",
+      upi_at_door: "Place UPI-on-delivery order →"
+    };
+    button.textContent = labels[method] || "Choose a payment method →";
+  }
+
   function renderPaymentAvailability() {
     const onlineOption = $("#onlinePaymentChoice");
+    const onlineInput = onlineOption && onlineOption.querySelector('input[name="paymentMethod"]');
+    const onlineDescription = onlineOption && onlineOption.querySelector("small");
     const note = $("#paymentAvailabilityNote");
-    if (!onlineOption || !note) return;
-    onlineOption.hidden = !state.paymentGateway.enabled;
+    if (!onlineOption || !onlineInput || !note) return;
+    onlineOption.hidden = false;
+    onlineInput.disabled = !state.paymentGateway.enabled;
+    onlineOption.classList.toggle("is-unavailable", !state.paymentGateway.enabled);
+    onlineOption.setAttribute("aria-disabled", String(!state.paymentGateway.enabled));
+    if (onlineDescription) {
+      onlineDescription.textContent = state.paymentGateway.enabled
+        ? "UPI, cards, netbanking and more"
+        : "Not activated yet. Backend setup required.";
+    }
     note.textContent = state.paymentGateway.enabled
-      ? "Secure online checkout is ready. Payments are verified by the FoodieHub server."
-      : "Online payment is not connected yet. You can still choose Cash on Delivery or UPI on Delivery.";
+      ? "Secure online checkout is active. Select Pay online securely to open the Razorpay payment window."
+      : "Online payment is not connected yet. COD and UPI on delivery place your order without opening a payment page.";
   }
 
   function openCheckout() {
@@ -655,6 +676,7 @@
     showLegacyAddress("checkoutLegacyAddress",state.profile);
     updateAddressPreview("checkoutForm","checkoutAddressPreview");
     $("#saveCheckoutProfile").checked = true;
+    updatePaymentButtonLabel("");
     renderPaymentAvailability();
     renderCart();
     openDialog("checkoutDialog");
@@ -763,6 +785,17 @@
   async function placeOrder(event) {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
+    const paymentMethod = String(form.get("paymentMethod") || "");
+    if (!paymentMethod) {
+      $("#checkoutError").textContent = "Choose a payment method before placing your order. COD and UPI on delivery are paid at your door; they do not open an online payment page.";
+      const firstChoice = event.currentTarget.querySelector('input[name="paymentMethod"]:not(:disabled)');
+      if (firstChoice) firstChoice.focus();
+      return;
+    }
+    if (paymentMethod === "razorpay" && (!state.backendOnline || !state.paymentGateway.enabled)) {
+      $("#checkoutError").textContent = "Online payment is not active yet. Connect the hosted FoodieHub API and Razorpay server keys first.";
+      return;
+    }
     const addressDetails=readAddressDetails(form);
     const customer = {
       name: String(form.get("name") || "").trim(),
@@ -791,7 +824,6 @@
       event.currentTarget.elements.namedItem("pincode").focus();
       return;
     }
-    const paymentMethod = String(form.get("paymentMethod") || "cod");
     const payload = {
       customer,
       items: getCartLines().map(item => ({ productId: item.id, quantity: item.quantity, customizations: item.customization || {} })),
@@ -829,7 +861,7 @@
       $("#checkoutError").textContent = error.message || "We couldn't place that order. Please try again.";
     } finally {
       submit.disabled = false;
-      submit.innerHTML = 'Place my order <span aria-hidden="true">↗</span>';
+      updatePaymentButtonLabel(paymentMethod);
     }
   }
 
@@ -1420,9 +1452,8 @@
     $("#checkoutForm").addEventListener("submit", placeOrder);
     $("#checkoutForm").addEventListener("change", event => {
       if (event.target && event.target.name === "paymentMethod") {
-        $(".place-order-button").textContent = event.target.value === "razorpay"
-          ? "Continue to secure payment →"
-          : "Place my order →";
+        $("#checkoutError").textContent = "";
+        updatePaymentButtonLabel(event.target.value);
       }
     });
     $("#trackingForm").addEventListener("submit", trackOrder);
