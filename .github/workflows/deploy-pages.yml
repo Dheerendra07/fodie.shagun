@@ -57,6 +57,8 @@ jobs:
           cp -R assets/css assets/js _site/assets/
           mkdir -p _site/projects
           cp -R projects/fittrack _site/projects/fittrack
+          mkdir -p _site/fittrack
+          cp fittrack/index.html _site/fittrack/index.html
           cp data/menu.json _site/data/
           touch _site/.nojekyll
           test -s _site/index.html
