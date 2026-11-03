@@ -91,6 +91,12 @@ function calculateCoupon(code, subtotal) {
 }
 function calculateCustomization(product, input) {
   const data = input === undefined || input === null ? {} : validation.requireObject(input, "Dish customisation");
+  const unknownCustomizationFields = Object.keys(data).filter(key => !["size", "extras", "preferences", "note"].includes(key));
+  if (unknownCustomizationFields.length) {
+    const error = new Error("Unsupported dish customisation fields: " + unknownCustomizationFields.join(", ") + ".");
+    error.status = 400;
+    throw error;
+  }
   const category = String(product.category || "").toLowerCase();
   const largePrice = category === "drinks" ? 30 : category === "desserts" ? 35 : category === "sides" ? 29 : 49;
   const largeName = category === "desserts" ? "Double treat" : "Large";
@@ -179,7 +185,9 @@ function calculateCustomization(product, input) {
     ? ["Less ice", "No added sugar", "Extra chilled"]
     : category === "desserts"
       ? ["Warm it slightly", "No extra drizzle"]
-      : ["Less spicy", "Medium spicy", "Extra spicy", "Extra crispy", "No onion", "Sauce on the side"];
+      : ["burgers", "pizza", "sides"].includes(category)
+        ? ["Less spicy", "Extra spicy", "Extra crispy", "No onion"]
+        : ["Less spicy", "Medium spicy", "Extra spicy", "No onion", "Sauce on the side"];
   const requestedPreferences = data.preferences || [];
   if (requestedPreferences.length > 8 || requestedPreferences.some(value => typeof value !== "string" || !preferenceOptions.includes(value)) ||
       new Set(requestedPreferences).size !== requestedPreferences.length) {
