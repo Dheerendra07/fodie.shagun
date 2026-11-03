@@ -623,6 +623,7 @@ function createProductionBackend(options) {
     let updated;
     try {
       updated = validateMenuItem(req.body, existing);
+      if (updated.id !== id) throw httpError("A menu item ID cannot be changed after creation.");
     } catch (error) {
       return res.status(error.status || 400).json({ error: error.message || "Menu item details are invalid." });
     }
