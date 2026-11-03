@@ -9,6 +9,7 @@ const Database = require("better-sqlite3");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
+const validation = require("./validation");
 
 const app = express();
 const ROOT = path.resolve(__dirname, "..");
@@ -81,14 +82,15 @@ function round(value) {
   return Math.round((Number(value) + Number.EPSILON) * 100) / 100;
 }
 function cleanPhone(value) {
-  return String(value || "").replace(/\D/g, "").slice(-10);
+  try { return validation.normalizePhone(value); }
+  catch (_) { return ""; }
 }
 function calculateCoupon(code, subtotal) {
   if (production) return production.calculateCoupon(code, subtotal);
   return { code: "", discount: 0 };
 }
 function calculateCustomization(product, input) {
-  const data = input && typeof input === "object" ? input : {};
+  const data = input === undefined || input === null ? {} : validation.requireObject(input, "Dish customisation");
   const category = String(product.category || "").toLowerCase();
   const largePrice = category === "drinks" ? 30 : category === "desserts" ? 35 : category === "sides" ? 29 : 49;
   const largeName = category === "desserts" ? "Double treat" : "Large";
@@ -141,23 +143,52 @@ function calculateCustomization(product, input) {
       { name: "Make it loaded", price: 35 }
     ];
   }
-  const requestedExtras = Array.isArray(data.extras) ? data.extras : [];
+  if (data.extras !== undefined && !Array.isArray(data.extras)) {
+    const error = new Error("Dish add-ons must be sent as a list.");
+    error.status = 400;
+    throw error;
+  }
+  const requestedExtras = data.extras || [];
   if (requestedExtras.length > 8) {
     const error = new Error("Too many add-ons were selected.");
     error.status = 400;
     throw error;
   }
+  const requestedExtraNames = new Set();
   const extras = requestedExtras.map(extra => {
-    const allowed = allowedExtras.find(option => option.name === String(extra && extra.name || ""));
-    if (!allowed) {
+    if (!extra || typeof extra !== "object" || Array.isArray(extra) || typeof extra.name !== "string") {
+      const error = new Error("Each dish add-on must contain a valid name.");
+      error.status = 400;
+      throw error;
+    }
+    const allowed = allowedExtras.find(option => option.name === extra.name);
+    if (!allowed || requestedExtraNames.has(allowed.name)) {
       const error = new Error("One of the selected add-ons is not available for this dish.");
       error.status = 400;
       throw error;
     }
+    requestedExtraNames.add(allowed.name);
     return { name: allowed.name, price: allowed.price };
   });
-  const preferences = Array.isArray(data.preferences) ? data.preferences.map(String).slice(0, 8) : [];
-  const note = String(data.note || "").trim().slice(0, 180);
+  if (data.preferences !== undefined && !Array.isArray(data.preferences)) {
+    const error = new Error("Kitchen preferences must be sent as a list.");
+    error.status = 400;
+    throw error;
+  }
+  const preferenceOptions = category === "drinks"
+    ? ["Less ice", "No added sugar", "Extra chilled"]
+    : category === "desserts"
+      ? ["Warm it slightly", "No extra drizzle"]
+      : ["Less spicy", "Medium spicy", "Extra spicy", "Extra crispy", "No onion", "Sauce on the side"];
+  const requestedPreferences = data.preferences || [];
+  if (requestedPreferences.length > 8 || requestedPreferences.some(value => typeof value !== "string" || !preferenceOptions.includes(value)) ||
+      new Set(requestedPreferences).size !== requestedPreferences.length) {
+    const error = new Error("One of the selected kitchen preferences is not available for this dish.");
+    error.status = 400;
+    throw error;
+  }
+  const preferences = requestedPreferences;
+  const note = validation.cleanString(data.note === undefined ? "" : data.note, "Kitchen note", { min: 0, max: 180, required: false });
   const sizeExtra = sizeOptions[requestedSize];
   return {
     size: requestedSize,
@@ -177,8 +208,18 @@ function calculateOrder(items, couponCode) {
   let subtotal = 0;
   const verifiedItems = [];
   for (const requested of items) {
-    const productId = String(requested.productId || "");
-    const quantity = Number(requested.quantity);
+    if (!requested || typeof requested !== "object" || Array.isArray(requested)) {
+      const error = new Error("Each order item must be a valid object.");
+      error.status = 400;
+      throw error;
+    }
+    if (typeof requested.productId !== "string" || typeof requested.quantity !== "number") {
+      const error = new Error("Each order item needs a product ID and numeric quantity.");
+      error.status = 400;
+      throw error;
+    }
+    const productId = validation.cleanString(requested.productId, "Menu item ID", { min: 1, max: 80, pattern: /^[a-z0-9-]+$/ });
+    const quantity = requested.quantity;
     const product = productById.get(productId);
     if (!product || (production && !production.isProductActive(productId)) || !Number.isInteger(quantity) || quantity < 1 || quantity > 20) {
       const error = new Error("One of the selected items is unavailable or has an invalid quantity.");
@@ -256,9 +297,10 @@ app.get("/api/categories", (req, res) => {
 });
 
 app.get("/api/menu", (req, res) => {
-  const query = String(req.query.q || "").trim().toLowerCase();
-  const category = String(req.query.category || "All");
-  const diet = String(req.query.diet || "all");
+  const query = validation.cleanString(req.query.q === undefined ? "" : req.query.q, "Menu search", { min: 0, max: 100, required: false }).toLowerCase();
+  const category = validation.cleanString(req.query.category === undefined ? "All" : req.query.category, "Menu category", { min: 1, max: 40 });
+  const diet = validation.cleanString(req.query.diet === undefined ? "all" : req.query.diet, "Diet filter", { min: 1, max: 10 });
+  if (diet !== "all" && diet !== "veg" && diet !== "nonveg") return res.status(400).json({ error: "Choose a valid dietary filter." });
   const inventory = new Map(db.prepare("SELECT product_id, quantity FROM inventory").all().map(row => [row.product_id, row.quantity]));
   const items = menu.filter(item => {
     const matchesActive = production.isProductActive(item.id);
@@ -275,41 +317,9 @@ app.get("/api/menu", (req, res) => {
 
 
 function validateCustomer(customer) {
-  const source = customer || {};
-  const name = String(source.name || "").trim();
-  const phone = cleanPhone(source.phone);
-  const email = String(source.email || "").trim().toLowerCase();
-  const rawAddress = source.addressDetails && typeof source.addressDetails === "object" ? source.addressDetails : {};
-  const addressDetails = {
-    house: String(rawAddress.house || "").trim(),
-    building: String(rawAddress.building || "").trim(),
-    street: String(rawAddress.street || "").trim(),
-    area: String(rawAddress.area || "").trim(),
-    landmark: String(rawAddress.landmark || "").trim(),
-    town: String(rawAddress.town || "").trim(),
-    city: String(rawAddress.city || "").trim(),
-    district: String(rawAddress.district || "").trim(),
-    state: String(rawAddress.state || "").trim(),
-    pincode: String(rawAddress.pincode || "").replace(/\D/g, "")
-  };
-  if (name.length < 2 || name.length > 80) { const error = new Error("Please enter a valid name."); error.status = 400; throw error; }
-  if (!/^[6-9]\d{9}$/.test(phone)) { const error = new Error("Please enter a valid 10-digit Indian mobile number."); error.status = 400; throw error; }
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { const error = new Error("Please enter a valid email address."); error.status = 400; throw error; }
-  const requiredAddressFields = ["house", "street", "area", "town", "city", "district", "state"];
-  const missing = requiredAddressFields.filter(field => !addressDetails[field]);
-  if (missing.length) { const error = new Error("Complete the house, street, area, town, city, district and state address fields."); error.status = 400; throw error; }
-  if (!/^[1-9]\d{5}$/.test(addressDetails.pincode)) { const error = new Error("Enter a valid 6-digit Indian PIN code."); error.status = 400; throw error; }
-  const places = [...new Set([addressDetails.town, addressDetails.city, addressDetails.district].filter(Boolean))];
-  const address = [
-    [addressDetails.house, addressDetails.building].filter(Boolean).join(", "),
-    [addressDetails.street, addressDetails.area].filter(Boolean).join(", "),
-    addressDetails.landmark ? "Near " + addressDetails.landmark : "",
-    places.join(", "),
-    addressDetails.state + " - " + addressDetails.pincode
-  ].filter(Boolean).join(", ");
-  if (address.length > 500) { const error = new Error("Please shorten your delivery address."); error.status = 400; throw error; }
-  return { name, phone, email, address, addressDetails };
+  return validation.validateCustomer(customer);
 }
+
 function razorpayEnabled() {
   return Boolean(process.env.RAZORPAY_KEY_ID && process.env.RAZORPAY_KEY_SECRET);
 }
@@ -446,15 +456,16 @@ app.post("/api/payments/verify", async (req, res, next) => {
 
 app.post("/api/orders", (req, res, next) => {
   try {
-    const body = req.body || {};
+    const body = validation.requireObject(req.body, "Order request");
     const customer = validateCustomer(body.customer);
     const { name, phone, email, address } = customer;
-    const paymentMethod = String(body.paymentMethod || "cod");
-    if (name.length < 2 || name.length > 80) return res.status(400).json({ error: "Please enter a valid name." });
-    if (!/^[6-9]\d{9}$/.test(phone)) return res.status(400).json({ error: "Please enter a valid 10-digit mobile number." });
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "Please enter a valid email address." });
-    if (address.length < 12 || address.length > 500) return res.status(400).json({ error: "Please enter a complete delivery address." });
-    if (!["cod", "upi_at_door"].includes(paymentMethod)) return res.status(400).json({ error: "Choose a supported demo payment method." });
+    const paymentMethod = body.paymentMethod === undefined ? "cod" : body.paymentMethod;
+    if (typeof paymentMethod !== "string" || !["cod", "upi_at_door"].includes(paymentMethod)) {
+      return res.status(400).json({ error: "Choose a supported delivery payment method." });
+    }
+    if (body.couponCode !== undefined && (typeof body.couponCode !== "string" || body.couponCode.length > 24)) {
+      return res.status(400).json({ error: "Enter a valid coupon code." });
+    }
 
     const bill = calculateOrder(body.items, body.couponCode);
     const orderNumber = createOrderNumber();
@@ -490,9 +501,11 @@ app.post("/api/orders", (req, res, next) => {
 });
 
 app.get("/api/orders/track", (req, res) => {
-  const orderNumber = String(req.query.order || "").trim().toUpperCase();
+  let orderNumber = "";
+  try { orderNumber = validation.validateOrderNumber(req.query.order); }
+  catch (_) { return res.status(400).json({ error: "Enter a valid FoodieHub order number." }); }
   const phone = cleanPhone(req.query.phone);
-  if (!orderNumber || !/^[6-9]\d{9}$/.test(phone)) {
+  if (!phone) {
     return res.status(400).json({ error: "Enter the order number and the mobile number used at checkout." });
   }
   const row = db.prepare("SELECT order_number, phone, status, total, payment_method, payment_status, created_at FROM orders WHERE order_number = ?").get(orderNumber);
@@ -586,8 +599,13 @@ app.patch("/api/admin/orders/:orderNumber", requireAdmin, (req, res) => {
 });
 
 app.post("/api/newsletter", (req, res) => {
-  const email = String((req.body || {}).email || "").trim().toLowerCase();
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: "Please enter a valid email address." });
+  let email;
+  try {
+    const body = validation.requireObject(req.body, "Newsletter request");
+    email = validation.normalizeEmail(body.email, "Email address", true);
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "Please enter a valid email address." });
+  }
   try {
     db.prepare("INSERT INTO subscribers (email, created_at) VALUES (?, ?)").run(email, new Date().toISOString());
     return res.status(201).json({ ok: true, message: "Thanks for subscribing." });
