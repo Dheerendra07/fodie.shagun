@@ -172,7 +172,10 @@
 
   function note(value) {
     const normalized = text(value, "Kitchen note", 0, 180, false);
-    return typeof normalized === "string" ? { valid: true, value: normalized } : { valid: false, error: normalized };
+    if (typeof normalized !== "string" || normalized.startsWith("Kitchen note ")) {
+      return { valid: false, error: normalized };
+    }
+    return { valid: true, value: normalized };
   }
 
   window.FoodieHubValidation = Object.freeze({ name, phone, email, address, profile, checkout, tracking, coupon, note });
