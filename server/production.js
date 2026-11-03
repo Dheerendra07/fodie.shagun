@@ -233,7 +233,9 @@ function createProductionBackend(options) {
   }
 
   async function registerCustomer(req, res) {
-    const body = validation.requireObject(req.body, "Registration request");
+    let body;
+    try { body = validation.requireObject(req.body, "Registration request"); }
+    catch (error) { return res.status(400).json({ error: error.message }); }
     let name = "";
     let email = "";
     let phone = "";
@@ -267,7 +269,9 @@ function createProductionBackend(options) {
   }
 
   async function loginCustomer(req, res) {
-    const body = validation.requireObject(req.body, "Sign-in request");
+    let body;
+    try { body = validation.requireObject(req.body, "Sign-in request"); }
+    catch (error) { return res.status(400).json({ error: error.message }); }
     const email = normalizeEmail(body.email);
     if (!email || !validEmail(email) || typeof body.password !== "string" || !body.password || body.password.length > 200) {
       return res.status(400).json({ error: "Enter a valid registered email and password." });
@@ -384,8 +388,10 @@ function createProductionBackend(options) {
       const session = createSession("foodiehub-admin", "admin");
       audit("foodiehub-admin", "admin.login", "session", "foodiehub-admin");
       return res.json({ ...session, role: "admin" });
-    } catch (_) {
-      return res.status(500).json({ error: "Admin sign in could not be completed." });
+    } catch (error) {
+      return res.status(error.status || 500).json({
+        error: error.status ? error.message : "Admin sign in could not be completed."
+      });
     }
   });
 
