@@ -5,6 +5,7 @@ const { promisify } = require("util");
 const scryptAsync = promisify(crypto.scrypt);
 const rateLimitPackage = require("express-rate-limit");
 const rateLimit = rateLimitPackage.rateLimit || rateLimitPackage;
+const validation = require("./validation");
 const PASSWORD_KEY_LENGTH = 64;
 const PASSWORD_COST = 16384;
 const PASSWORD_MAXMEM = 64 * 1024 * 1024;
@@ -67,15 +68,17 @@ function verifyToken(token, secret) {
 }
 
 function normalizeEmail(value) {
-  return String(value || "").trim().toLowerCase();
+  try { return validation.normalizeEmail(value, "Email address", false); }
+  catch (_) { return ""; }
 }
 
 function normalizePhone(value) {
-  return String(value || "").replace(/\D/g, "").slice(-10);
+  try { return validation.normalizePhone(value); }
+  catch (_) { return ""; }
 }
 
 function validEmail(value) {
-  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+  return validation.validateEmail(value);
 }
 
 function makeSlug(value) {
@@ -230,15 +233,21 @@ function createProductionBackend(options) {
   }
 
   async function registerCustomer(req, res) {
-    const body = req.body || {};
-    const name = String(body.name || "").trim();
-    const email = normalizeEmail(body.email);
-    const phone = normalizePhone(body.phone);
-    const password = String(body.password || "");
-    if (name.length < 2 || name.length > 80) return res.status(400).json({ error: "Enter a name between 2 and 80 characters." });
-    if (!validEmail(email)) return res.status(400).json({ error: "Enter a valid email address." });
-    if (!/^[6-9]\d{9}$/.test(phone)) return res.status(400).json({ error: "Enter a valid 10-digit Indian mobile number." });
-    if (password.length < 10 || password.length > 200) return res.status(400).json({ error: "Password must contain at least 10 characters." });
+    const body = validation.requireObject(req.body, "Registration request");
+    let name = "";
+    let email = "";
+    let phone = "";
+    try {
+      name = validation.validateName(body.name, "Full name");
+      email = validation.normalizeEmail(body.email, "Email address", true);
+      phone = validation.normalizePhone(body.phone);
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
+    if (typeof body.password !== "string" || body.password.length < 10 || body.password.length > 200) {
+      return res.status(400).json({ error: "Password must contain 10 to 200 characters." });
+    }
+    const password = body.password;
     const createdAt = now();
     const id = crypto.randomUUID();
     try {
@@ -258,10 +267,12 @@ function createProductionBackend(options) {
   }
 
   async function loginCustomer(req, res) {
-    const body = req.body || {};
+    const body = validation.requireObject(req.body, "Sign-in request");
     const email = normalizeEmail(body.email);
-    const password = String(body.password || "");
-    if (!validEmail(email) || !password) return res.status(400).json({ error: "Enter your registered email and password." });
+    if (!email || !validEmail(email) || typeof body.password !== "string" || !body.password || body.password.length > 200) {
+      return res.status(400).json({ error: "Enter a valid registered email and password." });
+    }
+    const password = body.password;
     const user = db.prepare("SELECT id, name, email, phone, password_hash, is_active, created_at FROM users WHERE email = ?").get(email);
     if (!user || !user.is_active || !(await verifyPassword(password, user.password_hash))) {
       return res.status(401).json({ error: "Email or password is incorrect." });
@@ -293,10 +304,15 @@ function createProductionBackend(options) {
     return res.json({ ok: true });
   });
   app.patch("/api/auth/me", requireCustomer, (req, res) => {
-    const name = String((req.body || {}).name || "").trim();
-    const phone = normalizePhone((req.body || {}).phone);
-    if (name.length < 2 || name.length > 80) return res.status(400).json({ error: "Enter a valid name." });
-    if (!/^[6-9]\d{9}$/.test(phone)) return res.status(400).json({ error: "Enter a valid 10-digit Indian mobile number." });
+    const body = validation.requireObject(req.body, "Profile update");
+    let name = "";
+    let phone = "";
+    try {
+      name = validation.validateName(body.name, "Full name");
+      phone = validation.normalizePhone(body.phone);
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
     try {
       db.prepare("UPDATE users SET name = ?, phone = ?, updated_at = ? WHERE id = ?").run(name, phone, now(), req.user.id);
       return res.json({ user: db.prepare("SELECT id, name, email, phone, created_at FROM users WHERE id = ?").get(req.user.id) });
@@ -333,14 +349,15 @@ function createProductionBackend(options) {
   });
 
   app.post("/api/auth/addresses", requireCustomer, (req, res) => {
-    const body = req.body || {};
-    const label = String(body.label || "Home").trim().slice(0, 30) || "Home";
-    const address = body.address;
-    const requiredAddressFields = ["house", "street", "area", "town", "city", "district", "state"];
-    const completeAddress = address && typeof address === "object" &&
-      requiredAddressFields.every(key => String(address[key] || "").trim().length > 0) &&
-      /^[1-9]\d{5}$/.test(String(address.pincode || ""));
-    if (!completeAddress) return res.status(400).json({ error: "Provide all required structured address fields and a valid PIN code." });
+    let label;
+    let address;
+    try {
+      const body = validation.requireObject(req.body, "Saved address");
+      label = body.label === undefined ? "Home" : validation.validateLabel(body.label);
+      address = validation.validateAddress(body.address, { required: true });
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
     const id = crypto.randomUUID();
     db.prepare("INSERT INTO user_addresses (id, user_id, label, address_json, created_at) VALUES (?, ?, ?, ?, ?)")
       .run(id, req.user.id, label, JSON.stringify(address), now());
@@ -355,8 +372,9 @@ function createProductionBackend(options) {
 
   app.post("/api/admin/auth/login", async (req, res) => {
     try {
-      const email = normalizeEmail((req.body || {}).email);
-      const password = String((req.body || {}).password || "");
+      const body = validation.requireObject(req.body, "Admin sign-in request");
+      const email = normalizeEmail(body.email);
+      const password = typeof body.password === "string" ? body.password : "";
       const expectedEmail = normalizeEmail(process.env.ADMIN_EMAIL);
       const passwordHash = process.env.ADMIN_PASSWORD_HASH || "";
       if (!expectedEmail || !passwordHash) return res.status(503).json({ error: "Admin email login is not configured on this server." });
@@ -373,9 +391,13 @@ function createProductionBackend(options) {
 
   app.post("/api/coupons/validate", (req, res) => {
     try {
-      const subtotal = Number((req.body || {}).subtotal);
-      if (!Number.isFinite(subtotal) || subtotal < 0) return res.status(400).json({ error: "Enter a valid order subtotal." });
-      const result = calculateCoupon((req.body || {}).code, subtotal);
+      const body = validation.requireObject(req.body, "Coupon validation request");
+      const subtotal = body.subtotal;
+      if (typeof subtotal !== "number" || !Number.isFinite(subtotal) || subtotal < 0 || subtotal > 1000000) {
+        return res.status(400).json({ error: "Enter a valid order subtotal." });
+      }
+      if (typeof body.code !== "string" || body.code.length > 24) return res.status(400).json({ error: "Enter a valid coupon code." });
+      const result = calculateCoupon(body.code, subtotal);
       if (!result.code) return res.status(404).json({ error: "That coupon code is not available." });
       return res.json({ ...result, subtotal, discountedSubtotal: Math.max(0, subtotal - result.discount) });
     } catch (error) {
