@@ -17,7 +17,8 @@
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Serif+Display&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="./assets/css/styles.css?v=payment-choice-fix-20261102">
   <script src="./assets/js/config.js"></script>
-  <script defer src="./assets/js/app.js?v=payment-choice-fix-20261102"></script>
+  <script defer src="./assets/js/validation.js?v=input-validation-20261103"></script>
+  <script defer src="./assets/js/app.js?v=input-validation-20261103"></script>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -189,7 +190,7 @@
         <div class="search-box">
           <span class="search-icon" aria-hidden="true">⌕</span>
           <label class="visually-hidden" for="menuSearch">Search the menu</label>
-          <input id="menuSearch" type="search" placeholder="Search dishes, ingredients..." autocomplete="off">
+          <input id="menuSearch" type="search" placeholder="Search dishes, ingredients..." maxlength="100" autocomplete="off">
           <kbd>⌘ K</kbd>
         </div>
         <label class="sort-control">
@@ -291,7 +292,7 @@
         <p>New dishes, fresh deals and good-food energy.</p>
         <form id="newsletterForm" class="newsletter-form">
           <label class="visually-hidden" for="newsletterEmail">Email address</label>
-          <input id="newsletterEmail" name="email" type="email" placeholder="Your email address" required>
+          <input id="newsletterEmail" name="email" type="email" placeholder="Your email address" maxlength="254" required autocomplete="email">
           <button type="submit" aria-label="Subscribe to newsletter">→</button>
         </form>
         <small id="newsletterMessage" aria-live="polite"></small>
@@ -316,7 +317,7 @@
     <div class="drawer-bottom">
       <div class="coupon-entry">
         <label for="couponInput">Have a little treat code?</label>
-        <div class="coupon-row"><input id="couponInput" type="text" placeholder="Enter code (e.g. HUB50)" maxlength="20"><button id="applyCoupon" type="button">Apply</button></div>
+        <div class="coupon-row"><input id="couponInput" type="text" placeholder="Enter code (e.g. HUB50)" minlength="3" maxlength="24" pattern="[A-Za-z0-9_-]{3,24}" autocapitalize="characters" spellcheck="false"><button id="applyCoupon" type="button">Apply</button></div>
         <p class="coupon-message" id="couponMessage" aria-live="polite">Try HUB50 for 50% off eligible orders above ₹699.</p>
       </div>
       <div class="delivery-progress" id="deliveryProgress"><span class="delivery-progress-icon">✦</span><span id="deliveryMessage">Add ₹499 worth of food for free delivery.</span></div>
@@ -337,19 +338,19 @@
     <form id="checkoutForm" class="checkout-form">
       <div class="form-intro"><span>01</span><div><strong>Your delivery details</strong><small>Where should the good stuff go?</small></div></div>
       <div class="form-grid">
-        <label class="form-field">Full name<input name="name" type="text" placeholder="Your name" minlength="2" required autocomplete="name"></label>
-        <label class="form-field">Mobile number<input name="phone" type="tel" placeholder="10-digit mobile number" inputmode="numeric" pattern="[6-9][0-9]{9}" minlength="10" maxlength="10" required autocomplete="tel"></label>
-        <label class="form-field form-field-full">Email address <span class="optional-label">Optional</span><input name="email" type="email" placeholder="you@example.com" autocomplete="email"></label>
+        <label class="form-field">Full name<input name="name" type="text" placeholder="Your name" minlength="2" maxlength="80" required autocomplete="name"></label>
+        <label class="form-field">Mobile number<input name="phone" type="tel" placeholder="10-digit mobile number" inputmode="tel" maxlength="18" required autocomplete="tel"></label>
+        <label class="form-field form-field-full">Email address <span class="optional-label">Optional</span><input name="email" type="email" placeholder="you@example.com" maxlength="254" autocomplete="email"></label>
 <div class="address-fields-intro"><span>DELIVERY ADDRESS</span><small>Enter the exact location so the rider can find your door.</small></div>
       <div class="form-grid address-grid">
-        <label class="form-field">House / Flat number<input name="house" type="text" placeholder="e.g. 204, B-Block" maxlength="80" required autocomplete="address-line1"></label>
+        <label class="form-field">House / Flat number<input name="house" type="text" placeholder="e.g. 204, B-Block" minlength="1" maxlength="80" required autocomplete="address-line1"></label>
         <label class="form-field">Building / Apartment <span class="optional-label">Optional</span><input name="building" type="text" placeholder="e.g. Green Residency" maxlength="100" autocomplete="organization"></label>
-        <label class="form-field form-field-full">Street / Road<input name="street" type="text" placeholder="Street, road or lane name" maxlength="120" required autocomplete="address-line2"></label>
-        <label class="form-field">Area / Locality<input name="area" type="text" placeholder="Colony, sector or locality" maxlength="120" required></label>
+        <label class="form-field form-field-full">Street / Road<input name="street" type="text" placeholder="Street, road or lane name" minlength="2" maxlength="120" required autocomplete="address-line2"></label>
+        <label class="form-field">Area / Locality<input name="area" type="text" placeholder="Colony, sector or locality" minlength="2" maxlength="120" required></label>
         <label class="form-field">Landmark <span class="optional-label">Optional</span><input name="landmark" type="text" placeholder="e.g. City Mall or Metro Station" maxlength="120"></label>
-        <label class="form-field">Town / Village<input name="town" type="text" placeholder="Town or village name" maxlength="100" required></label>
-        <label class="form-field">City<input name="city" type="text" placeholder="City name" maxlength="100" required autocomplete="address-level2"></label>
-        <label class="form-field">District<input name="district" type="text" placeholder="District name" maxlength="100" required></label>
+        <label class="form-field">Town / Village<input name="town" type="text" placeholder="Town or village name" minlength="2" maxlength="100" required></label>
+        <label class="form-field">City<input name="city" type="text" placeholder="City name" minlength="2" maxlength="100" required autocomplete="address-level2"></label>
+        <label class="form-field">District<input name="district" type="text" placeholder="District name" minlength="2" maxlength="100" required></label>
         <label class="form-field">State / Union Territory
           <select name="state" required>
             <option value="">Select state / UT</option>
@@ -388,9 +389,9 @@
       </div>
       <div class="form-intro"><span>01</span><div><strong>Personal details</strong><small>Your details are saved on this browser.</small></div></div>
       <div class="form-grid">
-        <label class="form-field">Full name<input name="name" type="text" placeholder="Your name" minlength="2" autocomplete="name"></label>
-        <label class="form-field">Mobile number<input name="phone" type="tel" placeholder="10-digit mobile number" inputmode="numeric" pattern="[6-9][0-9]{9}" minlength="10" maxlength="10" autocomplete="tel"></label>
-        <label class="form-field form-field-full">Email address <span class="optional-label">Optional</span><input name="email" type="email" placeholder="you@example.com" autocomplete="email"></label>
+        <label class="form-field">Full name<input name="name" type="text" placeholder="Your name" minlength="2" maxlength="80" autocomplete="name"></label>
+        <label class="form-field">Mobile number<input name="phone" type="tel" placeholder="10-digit mobile number" inputmode="tel" maxlength="18" autocomplete="tel"></label>
+        <label class="form-field form-field-full">Email address <span class="optional-label">Optional</span><input name="email" type="email" placeholder="you@example.com" maxlength="254" autocomplete="email"></label>
       </div>
       <div class="form-intro address-intro"><span>02</span><div><strong>Saved delivery address</strong><small>Use this as your default address at checkout.</small></div></div>
 <div class="address-fields-intro"><span>DELIVERY ADDRESS</span><small>Enter the exact location so the rider can find your door.</small></div>
@@ -469,8 +470,8 @@
         <label class="form-field">Pick a recent order on this device<select id="trackingRecentSelect" name="recentOrder"><option value="">Choose an order (optional)</option></select></label>
         <small>Choosing an order fills in its number and your saved mobile.</small>
       </div>
-      <label class="form-field">Order number<input name="orderNumber" type="text" placeholder="e.g. FH-ABC123" autocomplete="off" autocapitalize="characters" required></label>
-      <label class="form-field">Mobile number<input name="phone" type="tel" placeholder="The number used at checkout" inputmode="numeric" pattern="[6-9][0-9]{9}" minlength="10" maxlength="10" autocomplete="tel" required></label>
+      <label class="form-field">Order number<input name="orderNumber" type="text" placeholder="e.g. FH-A1B2C3D4" pattern="FH-[A-Za-z0-9]{8}" minlength="11" maxlength="11" autocomplete="off" autocapitalize="characters" required></label>
+      <label class="form-field">Mobile number<input name="phone" type="tel" placeholder="The number used at checkout" inputmode="tel" maxlength="18" autocomplete="tel" required></label>
       <p class="tracking-helper" id="trackingHelper">Tip: your mobile number can be prefilled from your saved profile.</p>
       <p class="form-error" id="trackingError" role="alert"></p>
       <button class="button button-primary" type="submit">Show my order status <span aria-hidden="true">→</span></button>
