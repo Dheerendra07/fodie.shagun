@@ -105,3 +105,98 @@ test("JWT tokens reject a modified signature", async () => {
   const changed = token.slice(0, -1) + (token.endsWith("a") ? "b" : "a");
   assert.equal(createProductionBackend.verifyToken(changed, secret), null);
 });
+
+
+test("registration and saved addresses reject malformed customer input", async t => {
+  const { base } = await fixture(t);
+  const malformedBody = await post(base, "/api/auth/register", []);
+  assert.equal(malformedBody.status, 400);
+
+  const invalidName = await post(base, "/api/auth/register", {
+    name: "123456", email: "customer@example.test", phone: "9876543210", password: "CustomerTestPass123!"
+  });
+  assert.equal(invalidName.status, 400);
+
+  const invalidPhone = await post(base, "/api/auth/register", {
+    name: "Test Customer", email: "customer@example.test", phone: "abc9876543210", password: "CustomerTestPass123!"
+  });
+  assert.equal(invalidPhone.status, 400);
+
+  const created = await post(base, "/api/auth/register", {
+    name: "Test Customer", email: "customer@example.test", phone: "+91 98765 43210", password: "CustomerTestPass123!"
+  });
+  assert.equal(created.status, 201);
+  const account = await created.json();
+  const invalidAddress = await post(base, "/api/auth/addresses", {
+    label: "Home",
+    address: {
+      house: "B-204", street: "Park Street", area: "Shastri Nagar",
+      town: "Meerut", city: "Meerut", district: "Meerut",
+      state: "Uttar Pradesh", pincode: "25A001"
+    }
+  }, account.token);
+  assert.equal(invalidAddress.status, 400);
+
+  const validAddress = await post(base, "/api/auth/addresses", {
+    label: "Home",
+    address: {
+      house: "B-204", building: "Green Residency", street: "Park Street", area: "Shastri Nagar",
+      town: "Meerut", city: "Meerut", district: "Meerut",
+      state: "Uttar Pradesh", pincode: "250001"
+    }
+  }, account.token);
+  assert.equal(validAddress.status, 201);
+});
+
+test("admin menu, inventory and coupon APIs reject string coercion and invalid fields", async t => {
+  const { base } = await fixture(t);
+  const login = await post(base, "/api/admin/auth/login", {
+    email: "admin@example.test", password: "FoodieHubTestPass123!"
+  });
+  assert.equal(login.status, 200);
+  const token = (await login.json()).token;
+
+  const invalidMenu = await post(base, "/api/admin/menu", {
+    id: "invalid-menu", name: "Test Pasta", category: "Pasta", price: "249"
+  }, token);
+  assert.equal(invalidMenu.status, 400);
+
+  const invalidBoolean = await post(base, "/api/admin/menu", {
+    id: "invalid-menu", name: "Test Pasta", category: "Pasta", price: 249,
+    originalPrice: 299, prepTime: 18, isVeg: "false"
+  }, token);
+  assert.equal(invalidBoolean.status, 400);
+
+  const validMenu = await post(base, "/api/admin/menu", {
+    id: "fresh-pasta", name: "Fresh Pasta", category: "Pasta", price: 249,
+    originalPrice: 299, prepTime: 18, isVeg: true, featured: false,
+    description: "Fresh pasta with sauce", badge: "Chef pick",
+    tags: ["fresh", "pasta"], image: "https://images.example.test/pasta.jpg"
+  }, token);
+  assert.equal(validMenu.status, 201);
+
+  const invalidStock = await fetch(base + "/api/admin/inventory/test-bowl", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+    body: JSON.stringify({ quantity: "4" })
+  });
+  assert.equal(invalidStock.status, 400);
+
+  const validStock = await fetch(base + "/api/admin/inventory/test-bowl", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+    body: JSON.stringify({ quantity: 4 })
+  });
+  assert.equal(validStock.status, 200);
+
+  const invalidCoupon = await post(base, "/api/admin/coupons", {
+    code: "TEST20", discountType: "percent", discountValue: "20", minimumOrder: 200
+  }, token);
+  assert.equal(invalidCoupon.status, 400);
+
+  const validCoupon = await post(base, "/api/admin/coupons", {
+    code: "TEST20", discountType: "percent", discountValue: 20,
+    minimumOrder: 200, maxDiscount: 80, maxUses: 10
+  }, token);
+  assert.equal(validCoupon.status, 201);
+});
