@@ -369,7 +369,11 @@ function createProductionBackend(options) {
   });
 
   app.delete("/api/auth/addresses/:id", requireCustomer, (req, res) => {
-    const result = db.prepare("DELETE FROM user_addresses WHERE id = ? AND user_id = ?").run(String(req.params.id), req.user.id);
+    const id = String(req.params.id || "");
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+      return res.status(400).json({ error: "Saved address ID is invalid." });
+    }
+    const result = db.prepare("DELETE FROM user_addresses WHERE id = ? AND user_id = ?").run(id, req.user.id);
     if (!result.changes) return res.status(404).json({ error: "Saved address not found." });
     return res.json({ ok: true });
   });
@@ -379,6 +383,9 @@ function createProductionBackend(options) {
       const body = validation.requireObject(req.body, "Admin sign-in request");
       const email = normalizeEmail(body.email);
       const password = typeof body.password === "string" ? body.password : "";
+      if (!email || !validEmail(email) || !password || password.length > 200) {
+        return res.status(400).json({ error: "Enter a valid admin email and password." });
+      }
       const expectedEmail = normalizeEmail(process.env.ADMIN_EMAIL);
       const passwordHash = process.env.ADMIN_PASSWORD_HASH || "";
       if (!expectedEmail || !passwordHash) return res.status(503).json({ error: "Admin email login is not configured on this server." });
@@ -808,7 +815,10 @@ function createProductionBackend(options) {
   });
 
   app.get("/api/admin/orders/:orderNumber", requireAdmin, (req, res) => {
-    const row = db.prepare("SELECT * FROM orders WHERE order_number = ?").get(String(req.params.orderNumber || "").toUpperCase());
+    let orderNumber;
+    try { orderNumber = validation.validateOrderNumber(req.params.orderNumber); }
+    catch (error) { return res.status(400).json({ error: error.message }); }
+    const row = db.prepare("SELECT * FROM orders WHERE order_number = ?").get(orderNumber);
     if (!row) return res.status(404).json({ error: "Order not found." });
     return res.json({
       orderNumber: row.order_number, customer: { name: row.customer_name, phone: row.phone, email: row.email },
@@ -821,7 +831,13 @@ function createProductionBackend(options) {
   });
 
   app.post("/api/admin/orders/:orderNumber/refund", requireAdmin, async (req, res) => {
-    const orderNumber = String(req.params.orderNumber || "").toUpperCase();
+    let orderNumber;
+    try {
+      orderNumber = validation.validateOrderNumber(req.params.orderNumber);
+      validation.requireObject(req.body === undefined ? {} : req.body, "Refund request");
+    } catch (error) {
+      return res.status(400).json({ error: error.message });
+    }
     const row = db.prepare("SELECT order_number, total, payment_status, razorpay_payment_id FROM orders WHERE order_number = ?").get(orderNumber);
     if (!row) return res.status(404).json({ error: "Order not found." });
     if (row.payment_status === "refunded") return res.json({ ok: true, orderNumber, paymentStatus: "refunded", message: "This order has already been refunded." });
