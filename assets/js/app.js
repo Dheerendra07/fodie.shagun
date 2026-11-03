@@ -625,7 +625,17 @@
   }
 
   function applyCoupon() {
-    const code = $("#couponInput").value.trim().toUpperCase();
+    const checkedCode = inputValidation.coupon($("#couponInput").value);
+    if (!checkedCode.valid) {
+      state.pendingRewardRedemption = false;
+      state.coupon = null;
+      $("#couponMessage").textContent = checkedCode.error;
+      $("#couponMessage").className = "coupon-message message-warning";
+      renderCart();
+      $("#couponInput").focus();
+      return;
+    }
+    const code = checkedCode.value;
     const coupons = {
       HUB50: { code: "HUB50", percent: 50, maximum: 200, minimum: 699 },
       FOOD25: { code: "FOOD25", percent: 25, maximum: 100, minimum: 299 },
@@ -635,7 +645,7 @@
     if (!coupons[code]) {
       state.pendingRewardRedemption = false;
       state.coupon = null;
-      $("#couponMessage").textContent = "That code doesn't look right. Try HUB50, FOOD25 or COMBO10, or redeem points in Rewards.";
+      $("#couponMessage").textContent = "That code isn't currently available. Try a listed offer or redeem points in Rewards.";
       $("#couponMessage").className = "coupon-message message-warning";
     } else if (calculateBill().subtotal < coupons[code].minimum) {
       state.pendingRewardRedemption = code === "REWARD25";
@@ -651,6 +661,7 @@
     }
     renderCart();
   }
+
 
   function updatePaymentButtonLabel(method) {
     const button = $(".place-order-button");
