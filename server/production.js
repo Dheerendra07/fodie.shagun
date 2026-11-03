@@ -516,6 +516,68 @@ function createProductionBackend(options) {
     return item;
   }
 
+
+  function validateMenuItem(input, existing = null) {
+    const body = validation.requireObject(input, "Menu item");
+    const allowedFields = new Set(["id", "name", "category", "price", "description", "originalPrice", "prepTime", "isVeg", "featured", "badge", "tags", "image"]);
+    const unknown = Object.keys(body).filter(key => !allowedFields.has(key));
+    if (unknown.length) throw httpError("Unsupported menu item fields: " + unknown.join(", ") + ".");
+    const name = validation.cleanString(body.name === undefined ? existing && existing.name : body.name, "Dish name", {
+      min: 2, max: 100, pattern: /^[\p{L}\p{M}\p{N} .,'&()/-]+$/u
+    });
+    const category = validation.cleanString(body.category === undefined ? existing && existing.category : body.category, "Dish category", {
+      min: 2, max: 40, pattern: /^[\p{L}\p{M}\p{N} &-]+$/u
+    });
+    const rawId = body.id === undefined ? (existing ? existing.id : name) : body.id;
+    if (typeof rawId !== "string") throw httpError("Dish ID must be text.");
+    const id = makeSlug(rawId);
+    if (!id || id.length > 70 || (body.id !== undefined && id !== rawId.trim().toLowerCase())) {
+      throw httpError("Dish ID may contain only lowercase letters, numbers and single hyphens.");
+    }
+    const price = body.price === undefined ? existing && existing.price : body.price;
+    if (typeof price !== "number" || !Number.isFinite(price) || price < 1 || price > 100000 || Math.round(price * 100) !== price * 100) {
+      throw httpError("Dish price must be a number between ₹1 and ₹100,000 with at most two decimal places.");
+    }
+    const originalPrice = body.originalPrice === undefined
+      ? (existing && typeof existing.originalPrice === "number" ? existing.originalPrice : price)
+      : body.originalPrice;
+    if (typeof originalPrice !== "number" || !Number.isFinite(originalPrice) || originalPrice < price || originalPrice > 100000 || Math.round(originalPrice * 100) !== originalPrice * 100) {
+      throw httpError("Original price must be a valid amount equal to or greater than the selling price.");
+    }
+    const prepTime = body.prepTime === undefined ? (existing ? existing.prepTime : 15) : body.prepTime;
+    if (!Number.isInteger(prepTime) || prepTime < 1 || prepTime > 240) throw httpError("Preparation time must be a whole number between 1 and 240 minutes.");
+    for (const field of ["isVeg", "featured"]) {
+      if (body[field] !== undefined && typeof body[field] !== "boolean") throw httpError(field + " must be true or false.");
+    }
+    const description = validation.cleanString(body.description === undefined ? (existing && existing.description || "") : body.description,
+      "Dish description", { min: 0, max: 300, required: false });
+    const badge = validation.cleanString(body.badge === undefined ? (existing && existing.badge || "") : body.badge,
+      "Dish badge", { min: 0, max: 60, required: false });
+    const tagsInput = body.tags === undefined ? (existing && existing.tags || []) : body.tags;
+    if (!Array.isArray(tagsInput) || tagsInput.length > 12) throw httpError("Dish tags must be a list containing at most 12 entries.");
+    const tags = tagsInput.map(tag => validation.cleanString(tag, "Dish tag", {
+      min: 1, max: 24, pattern: /^[\p{L}\p{M}\p{N} &-]+$/u
+    }));
+    if (new Set(tags.map(tag => tag.toLowerCase())).size !== tags.length) throw httpError("Dish tags cannot contain duplicates.");
+    const image = validation.cleanString(body.image === undefined ? (existing && existing.image || "") : body.image,
+      "Food image URL", { min: 0, max: 2048, required: false });
+    if (image) {
+      let parsed;
+      try { parsed = new URL(image); } catch (_) { throw httpError("Food image must be a valid HTTPS URL."); }
+      if (parsed.protocol !== "https:" || !parsed.hostname || parsed.username || parsed.password) {
+        throw httpError("Food image must be a valid public HTTPS URL.");
+      }
+    }
+    return {
+      id, name, category, price, description, originalPrice,
+      discountPercent: Math.max(0, Math.round((originalPrice - price) / originalPrice * 100)),
+      prepTime,
+      isVeg: body.isVeg === undefined ? (existing ? existing.isVeg : true) : body.isVeg,
+      featured: body.featured === undefined ? Boolean(existing && existing.featured) : body.featured,
+      badge, tags, image
+    };
+  }
+
   app.get("/api/admin/menu", requireAdmin, (req, res) => {
     const rows = db.prepare("SELECT product_id, data_json, is_active, updated_at FROM menu_catalog ORDER BY product_id").all();
     return res.json({
@@ -528,54 +590,28 @@ function createProductionBackend(options) {
   });
 
   app.post("/api/admin/menu", requireAdmin, (req, res) => {
-    const body = req.body || {};
-    const id = makeSlug(body.id || body.name);
-    const name = String(body.name || "").trim();
-    const category = String(body.category || "").trim();
-    const price = Number(body.price);
-    if (!id || name.length < 2 || name.length > 100 || !category || !Number.isFinite(price) || price < 1 || price > 100000) {
-      return res.status(400).json({ error: "Provide a valid dish ID, name, category and price." });
+    let item;
+    try {
+      item = validateMenuItem(req.body);
+    } catch (error) {
+      return res.status(error.status || 400).json({ error: error.message || "Menu item details are invalid." });
     }
-    if (productById.has(id)) return res.status(409).json({ error: "That menu item ID already exists." });
-    const item = {
-      id, name, category, price,
-      description: String(body.description || "").trim().slice(0, 300),
-      originalPrice: Number(body.originalPrice) > price ? Number(body.originalPrice) : price,
-      discountPercent: 0,
-      prepTime: Math.max(1, Math.min(240, Number(body.prepTime) || 15)),
-      isVeg: body.isVeg !== false,
-      featured: body.featured === true,
-      badge: String(body.badge || "").trim().slice(0, 60),
-      tags: Array.isArray(body.tags) ? body.tags.map(String).slice(0, 12) : [],
-      image: String(body.image || "").trim()
-    };
-    if (item.image && !/^https?:\/\//i.test(item.image)) return res.status(400).json({ error: "Food image must use a valid HTTPS or HTTP URL." });
-    updateMenuItem(id, item, true);
-    audit("admin", "menu.created", "menu_item", id, { name, price });
+    if (productById.has(item.id)) return res.status(409).json({ error: "That menu item ID already exists." });
+    updateMenuItem(item.id, item, true);
+    audit("admin", "menu.created", "menu_item", item.id, { name: item.name, price: item.price });
     return res.status(201).json({ item });
   });
 
   app.patch("/api/admin/menu/:productId", requireAdmin, (req, res) => {
     const id = String(req.params.productId || "");
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) return res.status(400).json({ error: "Menu item ID is invalid." });
     const existing = productById.get(id);
     if (!existing) return res.status(404).json({ error: "Menu item not found." });
-    const body = req.body || {};
-    const updated = { ...existing };
-    ["name", "description", "category", "badge", "image"].forEach(key => {
-      if (body[key] !== undefined) updated[key] = String(body[key]).trim();
-    });
-    for (const key of ["price", "originalPrice", "prepTime"]) {
-      if (body[key] !== undefined) {
-        const value = Number(body[key]);
-        if (!Number.isFinite(value) || value < 0 || value > 100000) return res.status(400).json({ error: "Enter valid numeric values for price, original price and preparation time." });
-        updated[key] = value;
-      }
-    }
-    if (body.isVeg !== undefined) updated.isVeg = Boolean(body.isVeg);
-    if (body.featured !== undefined) updated.featured = Boolean(body.featured);
-    if (body.tags !== undefined) updated.tags = Array.isArray(body.tags) ? body.tags.map(String).slice(0, 12) : [];
-    if (updated.name.length < 2 || !updated.category || updated.price < 1 || (updated.image && !/^https?:\/\//i.test(updated.image))) {
-      return res.status(400).json({ error: "Check the dish name, category, price and image URL." });
+    let updated;
+    try {
+      updated = validateMenuItem(req.body, existing);
+    } catch (error) {
+      return res.status(error.status || 400).json({ error: error.message || "Menu item details are invalid." });
     }
     const row = db.prepare("SELECT is_active FROM menu_catalog WHERE product_id = ?").get(id);
     updateMenuItem(id, updated, row ? Boolean(row.is_active) : true);
@@ -585,10 +621,14 @@ function createProductionBackend(options) {
 
   app.patch("/api/admin/menu/:productId/availability", requireAdmin, (req, res) => {
     const id = String(req.params.productId || "");
-    const body = req.body || {};
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) return res.status(400).json({ error: "Menu item ID is invalid." });
+    let body;
+    try { body = validation.requireObject(req.body, "Availability update"); }
+    catch (error) { return res.status(400).json({ error: error.message }); }
+    if (typeof body.available !== "boolean") return res.status(400).json({ error: "Availability must be true or false." });
     const row = db.prepare("SELECT data_json FROM menu_catalog WHERE product_id = ?").get(id);
     if (!row) return res.status(404).json({ error: "Menu item not found." });
-    const active = Boolean(body.available);
+    const active = body.available;
     db.prepare("UPDATE menu_catalog SET is_active = ?, updated_at = ? WHERE product_id = ?").run(active ? 1 : 0, now(), id);
     audit("admin", "menu.availability_changed", "menu_item", id, { active });
     return res.json({ productId: id, available: active });
@@ -596,6 +636,7 @@ function createProductionBackend(options) {
 
   app.delete("/api/admin/menu/:productId", requireAdmin, (req, res) => {
     const id = String(req.params.productId || "");
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) return res.status(400).json({ error: "Menu item ID is invalid." });
     const result = db.prepare("UPDATE menu_catalog SET is_active = 0, updated_at = ? WHERE product_id = ?").run(now(), id);
     if (!result.changes) return res.status(404).json({ error: "Menu item not found." });
     audit("admin", "menu.archived", "menu_item", id);
