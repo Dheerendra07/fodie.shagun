@@ -850,7 +850,20 @@
     };
     const payload = {
       customer,
-      items: getCartLines().map(item => ({ productId: item.id, quantity: item.quantity, customizations: item.customization || {} })),
+      items: getCartLines().map(item => ({
+        productId: item.id,
+        quantity: item.quantity,
+        customizations: {
+          size: item.customization && item.customization.size || "Regular",
+          extras: Array.isArray(item.customization && item.customization.extras)
+            ? item.customization.extras.map(extra => ({ name: extra.name }))
+            : [],
+          preferences: Array.isArray(item.customization && item.customization.preferences)
+            ? item.customization.preferences
+            : [],
+          note: item.customization && item.customization.note || ""
+        }
+      })),
       couponCode: state.coupon ? state.coupon.code : "",
       paymentMethod: checked.value.paymentMethod
     };
