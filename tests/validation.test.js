@@ -46,7 +46,7 @@ test("validates structured delivery address fields and allowed state values", ()
   assert.deepEqual(validation.validateAddress(address), address);
   assert.throws(() => validation.validateAddress({ ...address, pincode: "25A001" }), /PIN code/i);
   assert.throws(() => validation.validateAddress({ ...address, state: "Somewhere" }), /state/i);
-  assert.throws(() => validation.validateAddress({ ...address, street: " " }), /Street is required/i);
+  assert.throws(() => validation.validateAddress({ ...address, street: " " }), /Street must contain/i);
   assert.throws(() => validation.validateAddress({ ...address, phone: "9876543210" }), /unsupported fields/i);
   assert.throws(() => validation.validateAddress({ ...address, city: "<b>Meerut</b>" }), /unsupported characters/i);
   assert.throws(() => validation.validateAddress(null), /JSON object/i);
