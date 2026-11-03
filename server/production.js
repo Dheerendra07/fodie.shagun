@@ -655,8 +655,12 @@ function createProductionBackend(options) {
 
   app.patch("/api/admin/inventory/:productId", requireAdmin, (req, res) => {
     const id = String(req.params.productId || "");
-    const quantity = (req.body || {}).quantity;
-    if (!(quantity === null || (Number.isInteger(quantity) && quantity >= 0 && quantity <= 50000))) {
+    if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) return res.status(400).json({ error: "Menu item ID is invalid." });
+    let body;
+    try { body = validation.requireObject(req.body, "Inventory update"); }
+    catch (error) { return res.status(400).json({ error: error.message }); }
+    const quantity = body.quantity;
+    if (!(quantity === null || (typeof quantity === "number" && Number.isInteger(quantity) && quantity >= 0 && quantity <= 50000))) {
       return res.status(400).json({ error: "Stock quantity must be a non-negative whole number or null for untracked stock." });
     }
     const result = db.prepare("UPDATE inventory SET quantity = ?, updated_at = ? WHERE product_id = ?").run(quantity, now(), id);
@@ -670,23 +674,60 @@ function createProductionBackend(options) {
     return res.json({ coupons });
   });
 
+  function validateCouponDate(value, label) {
+    if (value === undefined || value === null || value === "") return null;
+    if (typeof value !== "string" || value.length > 40 || !Number.isFinite(Date.parse(value))) {
+      throw httpError(label + " must be a valid date or ISO date-time.");
+    }
+    return new Date(value).toISOString();
+  }
+
+  function validateCouponCode(value) {
+    const code = validation.cleanString(value, "Coupon code", { min: 3, max: 24 });
+    if (!/^[A-Z0-9_-]{3,24}$/i.test(code)) throw httpError("Coupon code may contain only 3–24 letters, numbers, hyphens or underscores.");
+    return code.toUpperCase();
+  }
+
   app.post("/api/admin/coupons", requireAdmin, (req, res) => {
-    const body = req.body || {};
-    const code = String(body.code || "").trim().toUpperCase();
-    const type = String(body.discountType || "percent");
-    const value = Number(body.discountValue);
-    const min = Number(body.minimumOrder || 0);
-    const maximum = body.maxDiscount == null ? null : Number(body.maxDiscount);
-    const maxUses = body.maxUses == null || body.maxUses === "" ? null : Number(body.maxUses);
-    if (!/^[A-Z0-9_-]{3,24}$/.test(code) || !["percent", "fixed"].includes(type) || !Number.isFinite(value) || value <= 0 || value > (type === "percent" ? 100 : 100000) || !Number.isFinite(min) || min < 0 || (maximum !== null && (!Number.isFinite(maximum) || maximum < 0)) || (maxUses !== null && (!Number.isInteger(maxUses) || maxUses < 1))) {
-      return res.status(400).json({ error: "Coupon details are invalid. Check code, discount, minimum and usage limit." });
+    let body;
+    let coupon;
+    try {
+      body = validation.requireObject(req.body, "Coupon");
+      const code = validateCouponCode(body.code);
+      const type = body.discountType === undefined ? "percent" : body.discountType;
+      if (typeof type !== "string" || !["percent", "fixed"].includes(type)) throw httpError("Discount type must be percent or fixed.");
+      const value = body.discountValue;
+      const min = body.minimumOrder === undefined ? 0 : body.minimumOrder;
+      const maximum = body.maxDiscount === undefined ? null : body.maxDiscount;
+      const maxUses = body.maxUses === undefined || body.maxUses === null ? null : body.maxUses;
+      if (typeof value !== "number" || !Number.isFinite(value) || value <= 0 || value > (type === "percent" ? 100 : 100000)) {
+        throw httpError("Discount value must be a valid positive number within the allowed limit.");
+      }
+      if (typeof min !== "number" || !Number.isFinite(min) || min < 0 || min > 1000000) {
+        throw httpError("Minimum order must be a valid non-negative amount.");
+      }
+      if (maximum !== null && (typeof maximum !== "number" || !Number.isFinite(maximum) || maximum < 0 || maximum > 100000)) {
+        throw httpError("Maximum discount must be a valid non-negative amount or null.");
+      }
+      if (maxUses !== null && (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > 10000000)) {
+        throw httpError("Maximum uses must be a positive whole number or null.");
+      }
+      const startsAt = validateCouponDate(body.startsAt, "Coupon start date");
+      const expiresAt = validateCouponDate(body.expiresAt, "Coupon expiry date");
+      if (startsAt && expiresAt && Date.parse(startsAt) > Date.parse(expiresAt)) {
+        throw httpError("Coupon start date must be before its expiry date.");
+      }
+      if (body.active !== undefined && typeof body.active !== "boolean") throw httpError("Coupon active status must be true or false.");
+      coupon = { code, type, value, min, maximum, maxUses, startsAt, expiresAt, active: body.active === undefined ? true : body.active };
+    } catch (error) {
+      return res.status(error.status || 400).json({ error: error.message || "Coupon details are invalid." });
     }
     const createdAt = now();
     try {
-      db.prepare("INSERT INTO coupons (code, discount_type, discount_value, max_discount, min_order, max_uses, used_count, starts_at, expires_at, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, 1, ?, ?)")
-        .run(code, type, value, maximum, min, maxUses, body.startsAt || null, body.expiresAt || null, createdAt, createdAt);
-      audit("admin", "coupon.created", "coupon", code);
-      return res.status(201).json({ ok: true, code });
+      db.prepare("INSERT INTO coupons (code, discount_type, discount_value, max_discount, min_order, max_uses, used_count, starts_at, expires_at, active, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?, ?)")
+        .run(coupon.code, coupon.type, coupon.value, coupon.maximum, coupon.min, coupon.maxUses, coupon.startsAt, coupon.expiresAt, coupon.active ? 1 : 0, createdAt, createdAt);
+      audit("admin", "coupon.created", "coupon", coupon.code);
+      return res.status(201).json({ ok: true, code: coupon.code, active: coupon.active });
     } catch (error) {
       if (String(error.code || "").startsWith("SQLITE_CONSTRAINT")) return res.status(409).json({ error: "That coupon code already exists." });
       return res.status(500).json({ error: "Coupon could not be created." });
@@ -694,33 +735,47 @@ function createProductionBackend(options) {
   });
 
   app.patch("/api/admin/coupons/:code", requireAdmin, (req, res) => {
-    const code = String(req.params.code || "").trim().toUpperCase();
+    let code;
+    try { code = validateCouponCode(req.params.code); }
+    catch (error) { return res.status(400).json({ error: error.message }); }
     const existing = getCoupon(code);
     if (!existing) return res.status(404).json({ error: "Coupon not found." });
-    const body = req.body || {};
-    const active = body.active === undefined ? existing.active : (body.active ? 1 : 0);
-    const startsAt = body.startsAt === undefined ? existing.starts_at : (body.startsAt || null);
-    const expiresAt = body.expiresAt === undefined ? existing.expires_at : (body.expiresAt || null);
-    const type = body.discountType === undefined ? existing.discount_type : String(body.discountType);
-    const value = body.discountValue === undefined ? Number(existing.discount_value) : Number(body.discountValue);
-    const minimum = body.minimumOrder === undefined ? Number(existing.min_order) : Number(body.minimumOrder);
-    const maximum = body.maxDiscount === undefined ? existing.max_discount : (body.maxDiscount === null ? null : Number(body.maxDiscount));
-    const maxUses = body.maxUses === undefined ? existing.max_uses : (body.maxUses === null ? null : Number(body.maxUses));
-    if (!["percent", "fixed"].includes(type) || !Number.isFinite(value) || value <= 0 || value > (type === "percent" ? 100 : 100000) ||
-        !Number.isFinite(minimum) || minimum < 0 || (maximum !== null && (!Number.isFinite(Number(maximum)) || Number(maximum) < 0)) ||
-        (maxUses !== null && (!Number.isInteger(Number(maxUses)) || Number(maxUses) < 1))) {
+    let body;
+    try { body = validation.requireObject(req.body, "Coupon update"); }
+    catch (error) { return res.status(400).json({ error: error.message }); }
+    const allowedFields = new Set(["active", "startsAt", "expiresAt", "discountType", "discountValue", "minimumOrder", "maxDiscount", "maxUses"]);
+    const unknown = Object.keys(body).filter(key => !allowedFields.has(key));
+    if (unknown.length) return res.status(400).json({ error: "Unsupported coupon fields: " + unknown.join(", ") + "." });
+
+    const active = body.active === undefined ? Boolean(existing.active) : body.active;
+    if (typeof active !== "boolean") return res.status(400).json({ error: "Coupon active status must be true or false." });
+    const startsAt = body.startsAt === undefined ? existing.starts_at : validateCouponDate(body.startsAt, "Coupon start date");
+    const expiresAt = body.expiresAt === undefined ? existing.expires_at : validateCouponDate(body.expiresAt, "Coupon expiry date");
+    if (startsAt && expiresAt && Date.parse(startsAt) > Date.parse(expiresAt)) {
+      return res.status(400).json({ error: "Coupon start date must be before its expiry date." });
+    }
+    const type = body.discountType === undefined ? existing.discount_type : body.discountType;
+    const value = body.discountValue === undefined ? Number(existing.discount_value) : body.discountValue;
+    const minimum = body.minimumOrder === undefined ? Number(existing.min_order) : body.minimumOrder;
+    const maximum = body.maxDiscount === undefined ? existing.max_discount : body.maxDiscount;
+    const maxUses = body.maxUses === undefined ? existing.max_uses : body.maxUses;
+    if (typeof type !== "string" || !["percent", "fixed"].includes(type) ||
+        typeof value !== "number" || !Number.isFinite(value) || value <= 0 || value > (type === "percent" ? 100 : 100000) ||
+        typeof minimum !== "number" || !Number.isFinite(minimum) || minimum < 0 || minimum > 1000000 ||
+        (maximum !== null && (typeof maximum !== "number" || !Number.isFinite(maximum) || maximum < 0 || maximum > 100000)) ||
+        (maxUses !== null && (!Number.isInteger(maxUses) || maxUses < 1 || maxUses > 10000000))) {
       return res.status(400).json({ error: "Coupon discount, minimum, maximum or usage limit is invalid." });
     }
-    if (startsAt && Number.isNaN(Date.parse(startsAt))) return res.status(400).json({ error: "Coupon start date is invalid." });
-    if (expiresAt && Number.isNaN(Date.parse(expiresAt))) return res.status(400).json({ error: "Coupon expiry date is invalid." });
     db.prepare("UPDATE coupons SET active = ?, starts_at = ?, expires_at = ?, discount_type = ?, discount_value = ?, min_order = ?, max_discount = ?, max_uses = ?, updated_at = ? WHERE code = ?")
-      .run(active, startsAt, expiresAt, type, value, minimum, maximum, maxUses, now(), code);
-    audit("admin", "coupon.updated", "coupon", code, { active: Boolean(active), discountType: type, discountValue: value });
-    return res.json({ ok: true, code, active: Boolean(active) });
+      .run(active ? 1 : 0, startsAt, expiresAt, type, value, minimum, maximum, maxUses, now(), code);
+    audit("admin", "coupon.updated", "coupon", code, { active, discountType: type, discountValue: value });
+    return res.json({ ok: true, code, active });
   });
 
   app.delete("/api/admin/coupons/:code", requireAdmin, (req, res) => {
-    const code = String(req.params.code || "").trim().toUpperCase();
+    let code;
+    try { code = validateCouponCode(req.params.code); }
+    catch (error) { return res.status(400).json({ error: error.message }); }
     const result = db.prepare("UPDATE coupons SET active = 0, updated_at = ? WHERE code = ?").run(now(), code);
     if (!result.changes) return res.status(404).json({ error: "Coupon not found." });
     audit("admin", "coupon.disabled", "coupon", code);
