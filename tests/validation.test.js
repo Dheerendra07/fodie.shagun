@@ -72,3 +72,54 @@ test("validates complete customer data and strict FoodieHub order numbers", () =
   assert.equal(validation.validateOrderNumber("fh-a1b2c3d4"), "FH-A1B2C3D4");
   assert.throws(() => validation.validateOrderNumber("anything-at-all"));
 });
+
+
+test("browser form validators reject incomplete or malformed field values", () => {
+  const fs = require("node:fs");
+  const vm = require("node:vm");
+  const browser = { window: {} };
+  vm.runInNewContext(fs.readFileSync(require.resolve("../assets/js/validation.js"), "utf8"), browser);
+  const client = browser.window.FoodieHubValidation;
+
+  const profile = client.profile({
+    name: "Dheerendra Singh",
+    phone: "+91 98765 43210",
+    email: "dheerendra@example.com",
+    addressDetails: {}
+  });
+  assert.equal(profile.valid, true);
+  assert.equal(profile.value.phone, "9876543210");
+
+  const badProfile = client.profile({
+    name: "12345",
+    phone: "abc9876543210",
+    email: "not-an-email",
+    addressDetails: {}
+  });
+  assert.equal(badProfile.valid, false);
+
+  const checkout = client.checkout({
+    name: "Dheerendra Singh",
+    phone: "9876543210",
+    email: "",
+    addressDetails: address,
+    paymentMethod: "cod"
+  });
+  assert.equal(checkout.valid, true);
+
+  const badCheckout = client.checkout({
+    name: "Dheerendra123",
+    phone: "9876543210",
+    email: "",
+    addressDetails: { ...address, pincode: "25A001" },
+    paymentMethod: "cash"
+  });
+  assert.equal(badCheckout.valid, false);
+
+  assert.equal(client.tracking("FH-A1B2C3D4", "9876543210").valid, true);
+  assert.equal(client.tracking("FH-NOT-VALID", "9876543210").valid, false);
+  assert.equal(client.coupon("hub50").value, "HUB50");
+  assert.equal(client.coupon("bad code").valid, false);
+  assert.equal(client.note("Keep sauce aside").valid, true);
+  assert.equal(client.note("x".repeat(181)).valid, false);
+});
