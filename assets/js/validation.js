@@ -85,10 +85,13 @@
     for (const field of ADDRESS_FIELDS) {
       const [min, max] = limits[field];
       const isRequired = required && REQUIRED_ADDRESS.includes(field);
-      const normalized = text(data[field] || "", field === "pincode" ? "PIN code" : field[0].toUpperCase() + field.slice(1),
+      const fieldLabel = field === "pincode" ? "PIN code" : field[0].toUpperCase() + field.slice(1);
+      const normalized = text(data[field] || "", fieldLabel,
         min, max, isRequired || Boolean(data[field]),
         field === "pincode" ? /^[1-9]\d{5}$/ : field === "state" ? null : /^[\p{L}\p{M}\p{N} .,'/#()&-]*$/u);
-      if (typeof normalized !== "string") return { error: normalized, field };
+      if (typeof normalized !== "string" || normalized.startsWith(fieldLabel + " ")) {
+        return { error: normalized, field };
+      }
       if (field === "state" && normalized && !STATES.has(normalized)) {
         return { error: "Select a valid Indian state or Union Territory.", field };
       }
