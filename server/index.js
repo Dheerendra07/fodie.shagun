@@ -576,9 +576,16 @@ app.get("/api/admin/analytics", requireAdmin, (req, res) => {
 
 app.patch("/api/admin/orders/:orderNumber", requireAdmin, (req, res) => {
   const allowedStatuses = ["confirmed", "preparing", "out_for_delivery", "delivered", "cancelled"];
-  const status = String((req.body || {}).status || "");
-  const orderNumber = String(req.params.orderNumber || "").toUpperCase();
-  if (!allowedStatuses.includes(status)) return res.status(400).json({ error: "That order status is not supported." });
+  let body;
+  let orderNumber;
+  try {
+    body = validation.requireObject(req.body, "Order status update");
+    orderNumber = validation.validateOrderNumber(req.params.orderNumber);
+  } catch (error) {
+    return res.status(400).json({ error: error.message || "Order update details are invalid." });
+  }
+  const status = body.status;
+  if (typeof status !== "string" || !allowedStatuses.includes(status)) return res.status(400).json({ error: "That order status is not supported." });
   const existing = db.prepare("SELECT status, payment_status FROM orders WHERE order_number = ?").get(orderNumber);
   if (!existing) return res.status(404).json({ error: "Order not found." });
   if (existing.status === "delivered" || existing.status === "cancelled") return res.status(409).json({ error: "This order has already reached a final status." });
