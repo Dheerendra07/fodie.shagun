@@ -5,6 +5,7 @@
   const $$ = (selector, root = document) => Array.from(root.querySelectorAll(selector));
   const money = value => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", maximumFractionDigits: 0 }).format(Math.round(Number(value) || 0));
   const API_BASE = (window.FOODIEHUB_API_URL || "").replace(/\/$/, "");
+  const inputValidation = window.FoodieHubValidation;
 
   const PHOTO_FALLBACKS = {
     Burgers:"https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=1100&q=88",
@@ -218,19 +219,24 @@
 
   function saveProfile(event) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const phone = String(form.get("phone") || "").replace(/\D/g, "").slice(-10);
-    if (phone && (phone.length !== 10 || !/^[6-9]/.test(phone))) {
-      $("#profileError").textContent = "Enter a valid 10-digit Indian mobile number, or leave it blank.";
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const addressDetails = readAddressDetails(form);
+    const checked = inputValidation.profile({
+      name: String(form.get("name") || ""),
+      phone: String(form.get("phone") || ""),
+      email: String(form.get("email") || ""),
+      addressDetails
+    });
+    if (!checked.valid) {
+      $("#profileError").textContent = checked.error;
+      const field = checked.field && formElement.elements.namedItem(checked.field);
+      if (field) field.focus();
       return;
     }
-    const addressDetails=readAddressDetails(form);
     state.profile = {
-      name: String(form.get("name") || "").trim(),
-      phone,
-      email: String(form.get("email") || "").trim(),
-      addressDetails,
-      address: formatDeliveryAddress(addressDetails) || state.profile.address || ""
+      ...checked.value,
+      address: formatDeliveryAddress(checked.value.addressDetails) || state.profile.address || ""
     };
     saveStore(STORAGE.profile, state.profile);
     renderProfile();
@@ -419,14 +425,32 @@
     const item = state.menu.find(product => product.id === id);
     if (!item) return;
     const size = $('input[name="dishSize"]:checked');
+    const noteCheck = inputValidation.note($("#customizerNote").value);
+    if (!noteCheck.valid) {
+      showToast(noteCheck.error, "error");
+      $("#customizerNote").focus();
+      return;
+    }
+    if (!size || !["Regular", customizerSizes(item)[1].name].includes(size.value)) {
+      showToast("Choose a valid serving size.", "error");
+      return;
+    }
+    if (!Number.isInteger(state.customizerQuantity) || state.customizerQuantity < 1 || state.customizerQuantity > 20) {
+      showToast("Dish quantity must be between 1 and 20.", "error");
+      return;
+    }
     const extras = $$('input[name="dishAddon"]:checked').map(input => ({ name: input.value, price: Number(input.dataset.price || 0) }));
     const preferences = $$('input[name="dishPreference"]:checked').map(input => input.value);
+    if (extras.length > 8 || new Set(extras.map(extra => extra.name)).size !== extras.length) {
+      showToast("Review the selected add-ons and try again.", "error");
+      return;
+    }
     state.customizations[id] = {
-      size: size ? size.value : "Regular",
-      sizeExtra: Number(size ? size.dataset.extra : 0),
+      size: size.value,
+      sizeExtra: Number(size.dataset.extra || 0),
       extras,
       preferences,
-      note: $("#customizerNote").value.trim()
+      note: noteCheck.value
     };
     state.cart[id] = Math.min(20, (state.cart[id] || 0) + state.customizerQuantity);
     saveStore(STORAGE.cart, state.cart);
@@ -784,54 +808,43 @@
 
   async function placeOrder(event) {
     event.preventDefault();
-    const form = new FormData(event.currentTarget);
-    const paymentMethod = String(form.get("paymentMethod") || "");
-    if (!paymentMethod) {
-      $("#checkoutError").textContent = "Choose a payment method before placing your order. COD and UPI on delivery are paid at your door; they do not open an online payment page.";
-      const firstChoice = event.currentTarget.querySelector('input[name="paymentMethod"]:not(:disabled)');
-      if (firstChoice) firstChoice.focus();
-      return;
-    }
+    const formElement = event.currentTarget;
+    const form = new FormData(formElement);
+    const paymentMethod = form.get("paymentMethod");
     if (paymentMethod === "razorpay" && (!state.backendOnline || !state.paymentGateway.enabled)) {
       $("#checkoutError").textContent = "Online payment is not active yet. Connect the hosted FoodieHub API and Razorpay server keys first.";
       return;
     }
-    const addressDetails=readAddressDetails(form);
-    const customer = {
-      name: String(form.get("name") || "").trim(),
-      phone: String(form.get("phone") || "").replace(/\D/g, "").slice(-10),
-      email: String(form.get("email") || "").trim(),
+    const addressDetails = readAddressDetails(form);
+    const checked = inputValidation.checkout({
+      name: String(form.get("name") || ""),
+      phone: String(form.get("phone") || ""),
+      email: String(form.get("email") || ""),
       addressDetails,
-      address: formatDeliveryAddress(addressDetails)
+      paymentMethod
+    });
+    if (!checked.valid) {
+      $("#checkoutError").textContent = checked.error;
+      const field = checked.field && formElement.elements.namedItem(checked.field);
+      if (field) field.focus();
+      else if (checked.field === "paymentMethod") {
+        const firstChoice = formElement.querySelector('input[name="paymentMethod"]:not(:disabled)');
+        if (firstChoice) firstChoice.focus();
+      }
+      return;
+    }
+    const customer = {
+      ...checked.value,
+      address: formatDeliveryAddress(checked.value.addressDetails)
     };
-    if (customer.name.length < 2) {
-      $("#checkoutError").textContent = "Please enter your name.";
-      return;
-    }
-    if (customer.phone.length !== 10 || !/^[6-9]/.test(customer.phone)) {
-      $("#checkoutError").textContent = "Please enter a valid 10-digit Indian mobile number.";
-      return;
-    }
-    const missingAddressField=ADDRESS_FIELDS.filter(field=>!["building","landmark"].includes(field)&&!addressDetails[field]);
-    if(missingAddressField.length){
-      $("#checkoutError").textContent = "Please complete all required delivery address fields.";
-      const firstMissing=event.currentTarget.elements.namedItem(missingAddressField[0]);
-      if(firstMissing)firstMissing.focus();
-      return;
-    }
-    if(!/^[1-9][0-9]{5}$/.test(addressDetails.pincode)){
-      $("#checkoutError").textContent = "Enter a valid 6-digit Indian PIN code.";
-      event.currentTarget.elements.namedItem("pincode").focus();
-      return;
-    }
     const payload = {
       customer,
       items: getCartLines().map(item => ({ productId: item.id, quantity: item.quantity, customizations: item.customization || {} })),
       couponCode: state.coupon ? state.coupon.code : "",
-      paymentMethod
+      paymentMethod: checked.value.paymentMethod
     };
     if (!payload.items.length) {
-      $("#checkoutError").textContent = "Your bag is empty. Add a dish before placing the order.";
+      $("#checkoutError").textContent = "Your bag is empty. Add a dish before placing your order.";
       return;
     }
     const submit = $(".place-order-button");
@@ -928,32 +941,27 @@
     event.preventDefault();
     const formElement = event.currentTarget;
     const form = new FormData(formElement);
-    const orderNumber = String(form.get("orderNumber") || "").trim().toUpperCase();
-    const phone = String(form.get("phone") || "").replace(/\D/g, "").slice(-10);
+    const checked = inputValidation.tracking(
+      String(form.get("orderNumber") || ""),
+      String(form.get("phone") || "")
+    );
     const error = $("#trackingError");
     const result = $("#trackingResult");
     const submit = formElement.querySelector('button[type="submit"]');
-
     error.textContent = "";
     result.hidden = true;
-
-    if (!orderNumber) {
-      error.textContent = "Choose a recent order or enter your order number.";
-      formElement.elements.namedItem("orderNumber").focus();
+    if (!checked.valid) {
+      error.textContent = checked.error;
+      const field = formElement.elements.namedItem(checked.field);
+      if (field) field.focus();
       return;
     }
-    if (!/^[6-9]\d{9}$/.test(phone)) {
-      error.textContent = "Enter the same valid 10-digit mobile number used at checkout.";
-      formElement.elements.namedItem("phone").focus();
-      return;
-    }
-
+    const { orderNumber, phone } = checked.value;
     submit.disabled = true;
     submit.textContent = "Finding your order…";
     try {
       let order = null;
       let apiError = null;
-
       if (state.backendOnline) {
         try {
           order = await request(
@@ -968,14 +976,12 @@
       } else {
         order = findLocalOrder(orderNumber, phone);
       }
-
       if (order && order.order) order = order.order;
       if (!order) {
         throw new Error(state.backendOnline
           ? "No order matched those details. Check the order number and checkout mobile."
           : "This order is not saved on this browser. Try the same browser and device used to place it.");
       }
-
       const canonicalNumber = normalizeOrderNumber(order) || orderNumber;
       const rawStatus = String(order.status || "confirmed").toLowerCase();
       const stages = [
@@ -1000,7 +1006,6 @@
           ? "Demo order received"
           : (stages[Math.max(0, currentStage)] || stages[0]).label);
       const total = Number(order.total || 0);
-
       result.innerHTML =
         '<span class="tracking-status-dot' + (isCancelled ? ' is-cancelled' : '') + '"></span>' +
         '<span class="drawer-kicker">ORDER ' + escapeHTML(canonicalNumber) + '</span>' +
@@ -1023,8 +1028,13 @@
 
   async function subscribe(event) {
     event.preventDefault();
-    const email = $("#newsletterEmail").value.trim();
+    const email = inputValidation.email($("#newsletterEmail").value, true);
     const message = $("#newsletterMessage");
+    if (typeof email !== "string" || email.startsWith("Enter ") || email.startsWith("Email address ")) {
+      message.textContent = typeof email === "string" ? email : "Enter a valid email address.";
+      $("#newsletterEmail").focus();
+      return;
+    }
     try {
       if (state.backendOnline) {
         await request("/api/newsletter", { method: "POST", body: JSON.stringify({ email }) });
@@ -1037,7 +1047,6 @@
       message.textContent = error.message;
     }
   }
-
 
   const SMART_COMBOS = [
     { id:"house",title:"The House Favourite",subtitle:"A classic burger-night trio",ids:["truffle-mushroom-burger","classic-masala-fries","mint-lime-cooler"],tag:"BEST LOVED" },
