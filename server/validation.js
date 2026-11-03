@@ -95,7 +95,7 @@ function normalizePhone(value, label = "Mobile number", required = true) {
 
 function validateAddress(input, options = {}) {
   const { required = true } = options;
-  const source = requireObject(input || {}, "Delivery address");
+  const source = requireObject(input === undefined || input === null ? (required ? input : {}) : input, "Delivery address");
   const unknown = Object.keys(source).filter(key => !ADDRESS_FIELDS.includes(key));
   if (unknown.length) invalid("Delivery address contains unsupported fields: " + unknown.join(", ") + ".");
   const hasAnyValue = ADDRESS_FIELDS.some(key => source[key] !== undefined && source[key] !== null && source[key] !== "");
