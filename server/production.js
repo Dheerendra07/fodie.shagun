@@ -525,7 +525,7 @@ function createProductionBackend(options) {
 
   function validateMenuItem(input, existing = null) {
     const body = validation.requireObject(input, "Menu item");
-    const allowedFields = new Set(["id", "name", "category", "price", "description", "originalPrice", "prepTime", "isVeg", "featured", "badge", "tags", "image"]);
+    const allowedFields = new Set(["id", "name", "category", "price", "description", "originalPrice", "discountPercent", "prepTime", "isVeg", "featured", "badge", "tags", "image"]);
     const unknown = Object.keys(body).filter(key => !allowedFields.has(key));
     if (unknown.length) throw httpError("Unsupported menu item fields: " + unknown.join(", ") + ".");
     const name = validation.cleanString(body.name === undefined ? existing && existing.name : body.name, "Dish name", {
