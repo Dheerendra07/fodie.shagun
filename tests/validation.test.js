@@ -52,6 +52,16 @@ test("validates structured delivery address fields and allowed state values", ()
   assert.throws(() => validation.validateAddress(null), /JSON object/i);
 });
 
+test("rejects unknown customer and address fields instead of silently ignoring them", () => {
+  assert.throws(() => validation.rejectUnknownFields({ name: "Test", role: "admin" }, ["name"], "Profile"), /unsupported fields: role/i);
+  assert.throws(() => validation.validateCustomer({
+    name: "Test Customer", phone: "9876543210", email: "", addressDetails: address, role: "admin"
+  }), /unsupported fields: role/i);
+  assert.throws(() => validation.validateCustomer({
+    name: "Test Customer", phone: "9876543210", email: "", addressDetails: { ...address, country: "India" }
+  }), /unsupported fields: country/i);
+});
+
 test("validates address labels without silently truncating them", () => {
   assert.equal(validation.validateLabel("Home"), "Home");
   assert.throws(() => validation.validateLabel("A".repeat(31)), /1 to 30/i);
@@ -68,6 +78,13 @@ test("validates complete customer data and strict FoodieHub order numbers", () =
   assert.equal(customer.phone, "9876543210");
   assert.equal(customer.email, "dheerendra@example.com");
   assert.match(customer.address, /Uttar Pradesh - 250001/);
+  assert.doesNotThrow(() => validation.validateCustomer({
+    name: "Test Customer", phone: "9876543210", email: "",
+    address: "B-204, Park Street, Meerut, Uttar Pradesh - 250001", addressDetails: address
+  }));
+  assert.throws(() => validation.validateCustomer({
+    name: "Test Customer", phone: "9876543210", email: "", address: 123, addressDetails: address
+  }), /Formatted delivery address must be text/i);
   assert.throws(() => validation.validateCustomer({ name: "Customer", phone: "abc9876543210", email: "", addressDetails: address }));
   assert.equal(validation.validateOrderNumber("fh-a1b2c3d4"), "FH-A1B2C3D4");
   assert.throws(() => validation.validateOrderNumber("anything-at-all"));
@@ -116,6 +133,8 @@ test("browser form validators reject incomplete or malformed field values", () =
   });
   assert.equal(badCheckout.valid, false);
 
+  assert.equal(client.address({ ...address, country: "India" }, true).error.includes("country"), true);
+  assert.equal(client.address(null, true).error.includes("object"), true);
   assert.equal(client.tracking("FH-A1B2C3D4", "9876543210").valid, true);
   assert.equal(client.tracking("FH-NOT-VALID", "9876543210").valid, false);
   assert.equal(client.coupon("hub50").value, "HUB50");

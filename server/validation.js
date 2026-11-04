@@ -36,6 +36,14 @@ function requireObject(value, label = "Request body") {
   return value;
 }
 
+function rejectUnknownFields(value, allowedFields, label = "Request") {
+  const source = requireObject(value, label);
+  const allowed = new Set(allowedFields);
+  const unknown = Object.keys(source).filter(key => !allowed.has(key));
+  if (unknown.length) invalid(label + " contains unsupported fields: " + unknown.join(", ") + ".");
+  return source;
+}
+
 function cleanString(value, label, options = {}) {
   const { min = 0, max = 500, required = true, pattern, allowNewlines = false } = options;
   if (value === undefined || value === null) {
@@ -124,7 +132,8 @@ function validateAddress(input, options = {}) {
 }
 
 function validateCustomer(input) {
-  const source = requireObject(input, "Customer details");
+  const source = rejectUnknownFields(input, ["name", "phone", "email", "address", "addressDetails"], "Customer details");
+  if (source.address !== undefined) cleanString(source.address, "Formatted delivery address", { min: 12, max: 500 });
   const name = validateName(source.name, "Full name");
   const phone = normalizePhone(source.phone);
   const email = normalizeEmail(source.email, "Email address", false);
@@ -171,6 +180,7 @@ module.exports = {
   cleanString,
   isPlainObject,
   requireObject,
+  rejectUnknownFields,
   validateName,
   normalizeEmail,
   normalizePhone,

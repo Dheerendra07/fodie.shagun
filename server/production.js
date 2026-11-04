@@ -234,7 +234,7 @@ function createProductionBackend(options) {
 
   async function registerCustomer(req, res) {
     let body;
-    try { body = validation.requireObject(req.body, "Registration request"); }
+    try { body = validation.rejectUnknownFields(req.body, ["name", "email", "phone", "password"], "Registration request"); }
     catch (error) { return res.status(400).json({ error: error.message }); }
     let name = "";
     let email = "";
@@ -270,7 +270,7 @@ function createProductionBackend(options) {
 
   async function loginCustomer(req, res) {
     let body;
-    try { body = validation.requireObject(req.body, "Sign-in request"); }
+    try { body = validation.rejectUnknownFields(req.body, ["email", "password"], "Sign-in request"); }
     catch (error) { return res.status(400).json({ error: error.message }); }
     const email = normalizeEmail(body.email);
     if (!email || !validEmail(email) || typeof body.password !== "string" || !body.password || body.password.length > 200) {
@@ -308,7 +308,9 @@ function createProductionBackend(options) {
     return res.json({ ok: true });
   });
   app.patch("/api/auth/me", requireCustomer, (req, res) => {
-    const body = validation.requireObject(req.body, "Profile update");
+    let body;
+    try { body = validation.rejectUnknownFields(req.body, ["name", "phone"], "Profile update"); }
+    catch (error) { return res.status(400).json({ error: error.message }); }
     let name = "";
     let phone = "";
     try {
@@ -356,7 +358,7 @@ function createProductionBackend(options) {
     let label;
     let address;
     try {
-      const body = validation.requireObject(req.body, "Saved address");
+      const body = validation.rejectUnknownFields(req.body, ["label", "address"], "Saved address");
       label = body.label === undefined ? "Home" : validation.validateLabel(body.label);
       address = validation.validateAddress(body.address, { required: true });
     } catch (error) {
@@ -380,7 +382,7 @@ function createProductionBackend(options) {
 
   app.post("/api/admin/auth/login", async (req, res) => {
     try {
-      const body = validation.requireObject(req.body, "Admin sign-in request");
+      const body = validation.rejectUnknownFields(req.body, ["email", "password"], "Admin sign-in request");
       const email = normalizeEmail(body.email);
       const password = typeof body.password === "string" ? body.password : "";
       if (!email || !validEmail(email) || !password || password.length > 200) {
@@ -404,7 +406,7 @@ function createProductionBackend(options) {
 
   app.post("/api/coupons/validate", (req, res) => {
     try {
-      const body = validation.requireObject(req.body, "Coupon validation request");
+      const body = validation.rejectUnknownFields(req.body, ["code", "subtotal"], "Coupon validation request");
       const subtotal = body.subtotal;
       if (typeof subtotal !== "number" || !Number.isFinite(subtotal) || subtotal < 0 || subtotal > 1000000) {
         return res.status(400).json({ error: "Enter a valid order subtotal." });
@@ -637,7 +639,7 @@ function createProductionBackend(options) {
     const id = String(req.params.productId || "");
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) return res.status(400).json({ error: "Menu item ID is invalid." });
     let body;
-    try { body = validation.requireObject(req.body, "Availability update"); }
+    try { body = validation.rejectUnknownFields(req.body, ["available"], "Availability update"); }
     catch (error) { return res.status(400).json({ error: error.message }); }
     if (typeof body.available !== "boolean") return res.status(400).json({ error: "Availability must be true or false." });
     const row = db.prepare("SELECT data_json FROM menu_catalog WHERE product_id = ?").get(id);
@@ -671,7 +673,7 @@ function createProductionBackend(options) {
     const id = String(req.params.productId || "");
     if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) return res.status(400).json({ error: "Menu item ID is invalid." });
     let body;
-    try { body = validation.requireObject(req.body, "Inventory update"); }
+    try { body = validation.rejectUnknownFields(req.body, ["quantity"], "Inventory update"); }
     catch (error) { return res.status(400).json({ error: error.message }); }
     const quantity = body.quantity;
     if (!(quantity === null || (typeof quantity === "number" && Number.isInteger(quantity) && quantity >= 0 && quantity <= 50000))) {
@@ -706,7 +708,7 @@ function createProductionBackend(options) {
     let body;
     let coupon;
     try {
-      body = validation.requireObject(req.body, "Coupon");
+      body = validation.rejectUnknownFields(req.body, ["code", "discountType", "discountValue", "minimumOrder", "maxDiscount", "maxUses", "startsAt", "expiresAt", "active"], "Coupon");
       const code = validateCouponCode(body.code);
       const type = body.discountType === undefined ? "percent" : body.discountType;
       if (typeof type !== "string" || !["percent", "fixed"].includes(type)) throw httpError("Discount type must be percent or fixed.");
@@ -835,7 +837,7 @@ function createProductionBackend(options) {
     let orderNumber;
     try {
       orderNumber = validation.validateOrderNumber(req.params.orderNumber);
-      validation.requireObject(req.body === undefined ? {} : req.body, "Refund request");
+      validation.rejectUnknownFields(req.body === undefined ? {} : req.body, [], "Refund request");
     } catch (error) {
       return res.status(400).json({ error: error.message });
     }

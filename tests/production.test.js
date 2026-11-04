@@ -44,6 +44,14 @@ async function fixture(t) {
   return { base, db, backend };
 }
 
+function validAddressFixture() {
+  return {
+    house: "B-204", building: "Green Residency", street: "Park Street", area: "Shastri Nagar",
+    landmark: "", town: "Meerut", city: "Meerut", district: "Meerut",
+    state: "Uttar Pradesh", pincode: "250001"
+  };
+}
+
 async function post(base, route, body, token) {
   return fetch(base + route, {
     method: "POST",
@@ -117,6 +125,12 @@ test("registration and saved addresses reject malformed customer input", async t
   });
   assert.equal(invalidName.status, 400);
 
+  const unexpectedRegistrationField = await post(base, "/api/auth/register", {
+    name: "Test Customer", email: "customer@example.test", phone: "9876543210",
+    password: "CustomerTestPass123!", role: "admin"
+  });
+  assert.equal(unexpectedRegistrationField.status, 400);
+
   const invalidPhone = await post(base, "/api/auth/register", {
     name: "Test Customer", email: "customer@example.test", phone: "abc9876543210", password: "CustomerTestPass123!"
   });
@@ -136,6 +150,11 @@ test("registration and saved addresses reject malformed customer input", async t
     }
   }, account.token);
   assert.equal(invalidAddress.status, 400);
+
+  const unexpectedAddressField = await post(base, "/api/auth/addresses", {
+    label: "Home", address: { ...validAddressFixture(), country: "India" }
+  }, account.token);
+  assert.equal(unexpectedAddressField.status, 400);
 
   const validAddress = await post(base, "/api/auth/addresses", {
     label: "Home",
@@ -182,6 +201,13 @@ test("admin menu, inventory and coupon APIs reject string coercion and invalid f
   });
   assert.equal(invalidStock.status, 400);
 
+  const unexpectedStockField = await fetch(base + "/api/admin/inventory/test-bowl", {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
+    body: JSON.stringify({ quantity: 4, trackingMode: "counted" })
+  });
+  assert.equal(unexpectedStockField.status, 400);
+
   const validStock = await fetch(base + "/api/admin/inventory/test-bowl", {
     method: "PATCH",
     headers: { "Content-Type": "application/json", Authorization: "Bearer " + token },
@@ -193,6 +219,12 @@ test("admin menu, inventory and coupon APIs reject string coercion and invalid f
     code: "TEST20", discountType: "percent", discountValue: "20", minimumOrder: 200
   }, token);
   assert.equal(invalidCoupon.status, 400);
+
+  const unexpectedCouponField = await post(base, "/api/admin/coupons", {
+    code: "TEST20", discountType: "percent", discountValue: 20,
+    minimumOrder: 200, maxDiscount: 80, maxUses: 10, hiddenAdmin: true
+  }, token);
+  assert.equal(unexpectedCouponField.status, 400);
 
   const validCoupon = await post(base, "/api/admin/coupons", {
     code: "TEST20", discountType: "percent", discountValue: 20,

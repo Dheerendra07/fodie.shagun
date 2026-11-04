@@ -71,7 +71,12 @@
   }
 
   function address(input, required = true) {
-    const data = input && typeof input === "object" && !Array.isArray(input) ? input : {};
+    if (!input || typeof input !== "object" || Array.isArray(input)) {
+      return { error: "Delivery address must be a valid object.", field: "house" };
+    }
+    const unknown = Object.keys(input).filter(field => !ADDRESS_FIELDS.includes(field));
+    if (unknown.length) return { error: "Delivery address contains unsupported fields: " + unknown.join(", ") + ".", field: unknown[0] };
+    const data = input;
     const hasAnyValue = ADDRESS_FIELDS.some(field => String(data[field] || "").trim());
     if (required && !input) return { error: "Complete your delivery address.", field: "house" };
     if (!required && !hasAnyValue) return { value: Object.fromEntries(ADDRESS_FIELDS.map(field => [field, ""])) };

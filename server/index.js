@@ -173,6 +173,12 @@ function calculateCustomization(product, input) {
       error.status = 400;
       throw error;
     }
+    const unknownExtraFields = Object.keys(extra).filter(key => key !== "name");
+    if (unknownExtraFields.length) {
+      const error = new Error("Unsupported dish add-on fields: " + unknownExtraFields.join(", ") + ".");
+      error.status = 400;
+      throw error;
+    }
     requestedExtraNames.add(allowed.name);
     return { name: allowed.name, price: allowed.price };
   });
@@ -226,6 +232,7 @@ function calculateOrder(items, couponCode) {
       error.status = 400;
       throw error;
     }
+    validation.rejectUnknownFields(requested, ["productId", "quantity", "customizations"], "Order item");
     const productId = validation.cleanString(requested.productId, "Menu item ID", { min: 1, max: 80, pattern: /^[a-z0-9-]+$/ });
     const quantity = requested.quantity;
     const product = productById.get(productId);
@@ -355,7 +362,10 @@ app.get("/api/payments/config", (req, res) => {
 app.post("/api/payments/create-order", async (req, res, next) => {
   try {
     if (!razorpayEnabled()) return res.status(503).json({ error: "Online payment is not enabled yet. Choose a delivery payment option." });
-    const body = req.body || {};
+    const body = validation.rejectUnknownFields(req.body, ["customer", "items", "couponCode", "paymentMethod"], "Payment order request");
+    if (body.paymentMethod !== undefined && body.paymentMethod !== "razorpay") {
+      return res.status(400).json({ error: "Choose the online payment method to continue." });
+    }
     const customer = validateCustomer(body.customer);
     const bill = calculateOrder(body.items, body.couponCode);
     const orderNumber = createOrderNumber();
@@ -393,11 +403,15 @@ app.post("/api/payments/create-order", async (req, res, next) => {
 app.post("/api/payments/verify", async (req, res, next) => {
   try {
     if (!razorpayEnabled()) return res.status(503).json({ error: "Online payment verification is not configured." });
-    const body = req.body || {};
-    const orderId = String(body.razorpay_order_id || "").trim();
-    const paymentId = String(body.razorpay_payment_id || "").trim();
-    const signature = String(body.razorpay_signature || "").trim();
-    if (!orderId || !paymentId || !/^[a-f0-9]{64}$/i.test(signature)) return res.status(400).json({ error: "The payment confirmation details are incomplete." });
+    const body = validation.rejectUnknownFields(req.body, ["razorpay_order_id", "razorpay_payment_id", "razorpay_signature"], "Payment verification request");
+    const orderId = typeof body.razorpay_order_id === "string" ? body.razorpay_order_id.trim() : "";
+    const paymentId = typeof body.razorpay_payment_id === "string" ? body.razorpay_payment_id.trim() : "";
+    const signature = typeof body.razorpay_signature === "string" ? body.razorpay_signature.trim() : "";
+    if (!/^order_[A-Za-z0-9]+$/.test(orderId) || orderId.length > 80 ||
+        !/^pay_[A-Za-z0-9]+$/.test(paymentId) || paymentId.length > 80 ||
+        !/^[a-f0-9]{64}$/i.test(signature)) {
+      return res.status(400).json({ error: "The payment confirmation details are incomplete or invalid." });
+    }
     const row = db.prepare("SELECT order_number, gateway_order_id, total, payment_status, status FROM orders WHERE gateway_order_id = ?").get(orderId);
     if (!row) return res.status(404).json({ error: "The FoodieHub order for this payment could not be found." });
     if (row.payment_status === "paid") return res.json({
@@ -464,7 +478,7 @@ app.post("/api/payments/verify", async (req, res, next) => {
 
 app.post("/api/orders", (req, res, next) => {
   try {
-    const body = validation.requireObject(req.body, "Order request");
+    const body = validation.rejectUnknownFields(req.body, ["customer", "items", "couponCode", "paymentMethod"], "Order request");
     const customer = validateCustomer(body.customer);
     const { name, phone, email, address } = customer;
     const paymentMethod = body.paymentMethod === undefined ? "cod" : body.paymentMethod;
@@ -587,7 +601,7 @@ app.patch("/api/admin/orders/:orderNumber", requireAdmin, (req, res) => {
   let body;
   let orderNumber;
   try {
-    body = validation.requireObject(req.body, "Order status update");
+    body = validation.rejectUnknownFields(req.body, ["status"], "Order status update");
     orderNumber = validation.validateOrderNumber(req.params.orderNumber);
   } catch (error) {
     return res.status(400).json({ error: error.message || "Order update details are invalid." });
@@ -616,7 +630,7 @@ app.patch("/api/admin/orders/:orderNumber", requireAdmin, (req, res) => {
 app.post("/api/newsletter", (req, res) => {
   let email;
   try {
-    const body = validation.requireObject(req.body, "Newsletter request");
+    const body = validation.rejectUnknownFields(req.body, ["email"], "Newsletter request");
     email = validation.normalizeEmail(body.email, "Email address", true);
   } catch (error) {
     return res.status(400).json({ error: error.message || "Please enter a valid email address." });
