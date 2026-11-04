@@ -1,0 +1,461 @@
+[
+  {
+    "id": "truffle-mushroom-burger",
+    "name": "Truffle Mushroom Burger",
+    "description": "Grilled mushroom, smoked cheese, crisp lettuce and truffle mayo.",
+    "category": "Burgers",
+    "price": 249,
+    "originalPrice": 398,
+    "discountPercent": 37,
+    "prepTime": 18,
+    "isVeg": true,
+    "featured": true,
+    "badge": "A FoodieHub favourite",
+    "tags": [
+      "mushroom",
+      "cheese",
+      "burger"
+    ],
+    "image": "https://images.unsplash.com/photo-1568901346375-23c9450c58cd?auto=format&fit=crop&w=900&q=85"
+  },
+  {
+    "id": "double-smash-burger",
+    "name": "Double Smash Burger",
+    "description": "Two juicy patties, cheddar, pickles and house-made burger sauce.",
+    "category": "Burgers",
+    "price": 299,
+    "originalPrice": 499,
+    "discountPercent": 40,
+    "prepTime": 20,
+    "isVeg": false,
+    "featured": true,
+    "badge": "Big flavour energy",
+    "tags": [
+      "beef",
+      "chicken",
+      "cheese",
+      "burger"
+    ],
+    "image": "https://images.unsplash.com/photo-1767065703793-7012f5fced19?auto=format&fit=crop&w=1100&q=88"
+  },
+  {
+    "id": "peri-peri-paneer-burger",
+    "name": "Peri Peri Paneer Burger",
+    "description": "Crispy paneer, spicy peri-peri glaze and creamy slaw.",
+    "category": "Burgers",
+    "price": 179,
+    "originalPrice": 299,
+    "discountPercent": 40,
+    "prepTime": 16,
+    "isVeg": true,
+    "featured": false,
+    "badge": "A little kick, a lot of joy",
+    "tags": [
+      "paneer",
+      "spicy",
+      "burger"
+    ],
+    "image": "https://images.unsplash.com/photo-1550547660-d9450f859349?auto=format&fit=crop&w=900&q=85"
+  },
+  {
+    "id": "classic-margherita-pizza",
+    "name": "Classic Margherita Pizza",
+    "description": "Slow tomato sauce, mozzarella and fragrant basil.",
+    "category": "Pizza",
+    "price": 239,
+    "originalPrice": 399,
+    "discountPercent": 40,
+    "prepTime": 22,
+    "isVeg": true,
+    "featured": true,
+    "badge": "Simple things, done well",
+    "tags": [
+      "pizza",
+      "cheese",
+      "basil"
+    ],
+    "image": "https://images.unsplash.com/photo-1658478006307-525ab032ab26?auto=format&fit=crop&w=1100&q=88"
+  },
+  {
+    "id": "fire-roasted-paneer-pizza",
+    "name": "Fire-Roasted Paneer Pizza",
+    "description": "Tandoori paneer, peppers, onion and a smoky cheese pull.",
+    "category": "Pizza",
+    "price": 329,
+    "originalPrice": 549,
+    "discountPercent": 40,
+    "prepTime": 24,
+    "isVeg": true,
+    "featured": false,
+    "badge": "Tandoori with a twist",
+    "tags": [
+      "pizza",
+      "paneer",
+      "tandoori"
+    ],
+    "image": "https://images.unsplash.com/photo-1513104890138-7c749659a591?auto=format&fit=crop&w=900&q=85"
+  },
+  {
+    "id": "smoky-bbq-chicken-pizza",
+    "name": "Smoky BBQ Chicken Pizza",
+    "description": "BBQ chicken, red onion, mozzarella and a smoky finish.",
+    "category": "Pizza",
+    "price": 349,
+    "originalPrice": 599,
+    "discountPercent": 42,
+    "prepTime": 25,
+    "isVeg": false,
+    "featured": true,
+    "badge": "For the bold-bite people",
+    "tags": [
+      "pizza",
+      "chicken",
+      "bbq"
+    ],
+    "image": "https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?auto=format&fit=crop&w=900&q=85"
+  },
+  {
+    "id": "creamy-pink-sauce-pasta",
+    "name": "Creamy Pink Sauce Pasta",
+    "description": "Silky tomato-cream sauce, parmesan and fresh herbs.",
+    "category": "Pasta",
+    "price": 229,
+    "originalPrice": 379,
+    "discountPercent": 40,
+    "prepTime": 17,
+    "isVeg": true,
+    "featured": true,
+    "badge": "Comfort in every forkful",
+    "tags": [
+      "pasta",
+      "cream",
+      "tomato"
+    ],
+    "image": "https://images.unsplash.com/photo-1608219992759-8d74ed8d76eb?auto=format&fit=crop&w=1100&q=88"
+  },
+  {
+    "id": "basil-pesto-pasta",
+    "name": "Basil Pesto Pasta",
+    "description": "Basil pesto, toasted nuts, parmesan and a little olive oil.",
+    "category": "Pasta",
+    "price": 249,
+    "originalPrice": 399,
+    "discountPercent": 38,
+    "prepTime": 17,
+    "isVeg": true,
+    "featured": false,
+    "badge": "Green goodness",
+    "tags": [
+      "pasta",
+      "basil",
+      "pesto"
+    ],
+    "image": "https://images.unsplash.com/photo-1546549032-9571cd6b27df?auto=format&fit=crop&w=1100&q=88"
+  },
+  {
+    "id": "chicken-alfredo-pasta",
+    "name": "Chicken Alfredo Pasta",
+    "description": "Tender chicken, parmesan cream sauce and cracked pepper.",
+    "category": "Pasta",
+    "price": 289,
+    "originalPrice": 479,
+    "discountPercent": 40,
+    "prepTime": 19,
+    "isVeg": false,
+    "featured": false,
+    "badge": "Rich, cosy and lovely",
+    "tags": [
+      "pasta",
+      "chicken",
+      "alfredo"
+    ],
+    "image": "https://images.unsplash.com/photo-1555949258-eb67b1ef0ceb?auto=format&fit=crop&w=900&q=85"
+  },
+  {
+    "id": "paneer-tikka-rice-bowl",
+    "name": "Paneer Tikka Rice Bowl",
+    "description": "Charred paneer, fragrant rice, pickled onion and mint chutney.",
+    "category": "Bowls",
+    "price": 219,
+    "originalPrice": 349,
+    "discountPercent": 37,
+    "prepTime": 18,
+    "isVeg": true,
+    "featured": true,
+    "badge": "A complete little meal",
+    "tags": [
+      "rice",
+      "paneer",
+      "indian"
+    ],
+    "image": "https://images.unsplash.com/photo-1701579231320-cc2f7acad3cd?auto=format&fit=crop&w=1100&q=88"
+  },
+  {
+    "id": "grilled-chicken-rice-bowl",
+    "name": "Grilled Chicken Rice Bowl",
+    "description": "Herb-grilled chicken, rice, greens and a lemon dressing.",
+    "category": "Bowls",
+    "price": 269,
+    "originalPrice": 449,
+    "discountPercent": 40,
+    "prepTime": 20,
+    "isVeg": false,
+    "featured": false,
+    "badge": "Fresh and filling",
+    "tags": [
+      "rice",
+      "chicken",
+      "healthy"
+    ],
+    "image": "https://images.unsplash.com/photo-1631515243349-e0cb75fb8d3a?auto=format&fit=crop&w=1100&q=88"
+  },
+  {
+    "id": "falafel-crunch-bowl",
+    "name": "Falafel Crunch Bowl",
+    "description": "Golden falafel, crunchy greens, hummus and tahini drizzle.",
+    "category": "Bowls",
+    "price": 199,
+    "originalPrice": 329,
+    "discountPercent": 39,
+    "prepTime": 16,
+    "isVeg": true,
+    "featured": false,
+    "badge": "A fresh little reset",
+    "tags": [
+      "falafel",
+      "hummus",
+      "vegan"
+    ],
+    "image": "https://images.unsplash.com/photo-1680405531955-8b4981bb1b0c?auto=format&fit=crop&w=1100&q=88"
+  },
+  {
+    "id": "butter-paneer-bowl",
+    "name": "Butter Paneer Rice Bowl",
+    "description": "Soft paneer in buttery tomato gravy with cumin rice.",
+    "category": "Indian",
+    "price": 249,
+    "originalPrice": 399,
+    "discountPercent": 38,
+    "prepTime": 19,
+    "isVeg": true,
+    "featured": true,
+    "badge": "Homestyle, with a glow-up",
+    "tags": [
+      "paneer",
+      "butter",
+      "rice",
+      "indian"
+    ],
+    "image": "https://images.unsplash.com/photo-1585937421612-70a008356fbe?auto=format&fit=crop&w=900&q=85"
+  },
+  {
+    "id": "chicken-biryani-bowl",
+    "name": "Dum Chicken Biryani",
+    "description": "Aromatic basmati, slow-cooked chicken and fragrant spices.",
+    "category": "Indian",
+    "price": 279,
+    "originalPrice": 459,
+    "discountPercent": 39,
+    "prepTime": 25,
+    "isVeg": false,
+    "featured": true,
+    "badge": "A proper classic",
+    "tags": [
+      "biryani",
+      "chicken",
+      "indian",
+      "rice"
+    ],
+    "image": "https://images.unsplash.com/photo-1641893728260-19493532d6b9?auto=format&fit=crop&w=1100&q=88"
+  },
+  {
+    "id": "loaded-peri-peri-fries",
+    "name": "Loaded Peri Peri Fries",
+    "description": "Crisp fries, peri-peri dust, cheese sauce and herbs.",
+    "category": "Sides",
+    "price": 129,
+    "originalPrice": 249,
+    "discountPercent": 48,
+    "prepTime": 12,
+    "isVeg": true,
+    "featured": false,
+    "badge": "Snack o'clock",
+    "tags": [
+      "fries",
+      "cheese",
+      "spicy"
+    ],
+    "image": "https://images.unsplash.com/photo-1573080496219-bb080dd4f877?auto=format&fit=crop&w=900&q=85"
+  },
+  {
+    "id": "classic-masala-fries",
+    "name": "Classic Masala Fries",
+    "description": "Golden fries tossed in our signature tangy masala.",
+    "category": "Sides",
+    "price": 99,
+    "originalPrice": 198,
+    "discountPercent": 50,
+    "prepTime": 10,
+    "isVeg": true,
+    "featured": false,
+    "badge": "FLAT 50% OFF",
+    "tags": [
+      "fries",
+      "potato",
+      "snack"
+    ],
+    "image": "https://images.unsplash.com/photo-1688978181542-87a886a16fbe?auto=format&fit=crop&w=1100&q=88"
+  },
+  {
+    "id": "crispy-chicken-popcorn",
+    "name": "Crispy Chicken Popcorn",
+    "description": "Bite-sized chicken, crunchy coating and a smoky dip.",
+    "category": "Sides",
+    "price": 149,
+    "originalPrice": 298,
+    "discountPercent": 50,
+    "prepTime": 14,
+    "isVeg": false,
+    "featured": false,
+    "badge": "FLAT 50% OFF",
+    "tags": [
+      "chicken",
+      "crispy",
+      "snack"
+    ],
+    "image": "https://images.unsplash.com/photo-1562967916-eb82221dfb92?auto=format&fit=crop&w=900&q=85"
+  },
+  {
+    "id": "chilli-garlic-momos",
+    "name": "Chilli Garlic Momos",
+    "description": "Steamed dumplings tossed in a punchy chilli-garlic sauce.",
+    "category": "Sides",
+    "price": 139,
+    "originalPrice": 229,
+    "discountPercent": 39,
+    "prepTime": 15,
+    "isVeg": true,
+    "featured": false,
+    "badge": "A spicy little favourite",
+    "tags": [
+      "momos",
+      "chilli",
+      "garlic"
+    ],
+    "image": "https://images.unsplash.com/photo-1534422298391-e4f8c172dddb?auto=format&fit=crop&w=1100&q=88"
+  },
+  {
+    "id": "dark-chocolate-lava-cake",
+    "name": "Dark Chocolate Lava Cake",
+    "description": "Warm chocolate cake with a soft, flowing centre.",
+    "category": "Desserts",
+    "price": 149,
+    "originalPrice": 298,
+    "discountPercent": 50,
+    "prepTime": 12,
+    "isVeg": true,
+    "featured": true,
+    "badge": "FLAT 50% OFF",
+    "tags": [
+      "chocolate",
+      "cake",
+      "dessert"
+    ],
+    "image": "https://images.unsplash.com/photo-1617305855058-336d24456869?auto=format&fit=crop&w=1100&q=88"
+  },
+  {
+    "id": "biscoff-cheesecake",
+    "name": "Biscoff Cheesecake",
+    "description": "Creamy cheesecake, biscuit crumb and caramelised spread.",
+    "category": "Desserts",
+    "price": 199,
+    "originalPrice": 329,
+    "discountPercent": 40,
+    "prepTime": 10,
+    "isVeg": true,
+    "featured": false,
+    "badge": "A sweet little moment",
+    "tags": [
+      "cheesecake",
+      "biscoff",
+      "dessert"
+    ],
+    "image": "https://images.unsplash.com/photo-1533134242443-d4fd215305ad?auto=format&fit=crop&w=900&q=85"
+  },
+  {
+    "id": "gulab-jamun-cheesecake",
+    "name": "Gulab Jamun Cheesecake",
+    "description": "A playful Indian-meets-classic dessert with cardamom notes.",
+    "category": "Desserts",
+    "price": 179,
+    "originalPrice": 299,
+    "discountPercent": 40,
+    "prepTime": 10,
+    "isVeg": true,
+    "featured": false,
+    "badge": "A desi sweet surprise",
+    "tags": [
+      "gulab jamun",
+      "cheesecake",
+      "dessert"
+    ],
+    "image": "https://images.unsplash.com/photo-1524351199678-941a58a3df50?auto=format&fit=crop&w=1100&q=88"
+  },
+  {
+    "id": "mango-milkshake",
+    "name": "Mango Milkshake",
+    "description": "Thick, chilled mango shake made for sunny-day cravings.",
+    "category": "Drinks",
+    "price": 119,
+    "originalPrice": 199,
+    "discountPercent": 40,
+    "prepTime": 7,
+    "isVeg": true,
+    "featured": false,
+    "badge": "Seasonal sunshine",
+    "tags": [
+      "mango",
+      "milkshake",
+      "drink"
+    ],
+    "image": "https://images.pexels.com/photos/8211179/pexels-photo-8211179.jpeg?auto=compress&cs=tinysrgb&w=1200"
+  },
+  {
+    "id": "iced-mocha",
+    "name": "Iced Mocha",
+    "description": "Cold coffee, dark chocolate and a smooth milk finish.",
+    "category": "Drinks",
+    "price": 119,
+    "originalPrice": 238,
+    "discountPercent": 50,
+    "prepTime": 6,
+    "isVeg": true,
+    "featured": false,
+    "badge": "FLAT 50% OFF",
+    "tags": [
+      "coffee",
+      "mocha",
+      "drink"
+    ],
+    "image": "https://images.unsplash.com/photo-1461023058943-07fcbe16d735?auto=format&fit=crop&w=900&q=85"
+  },
+  {
+    "id": "mint-lime-cooler",
+    "name": "Mint Lime Cooler",
+    "description": "Fresh lime, mint and a sparkling, refreshing finish.",
+    "category": "Drinks",
+    "price": 89,
+    "originalPrice": 149,
+    "discountPercent": 40,
+    "prepTime": 5,
+    "isVeg": true,
+    "featured": false,
+    "badge": "Freshen things up",
+    "tags": [
+      "lime",
+      "mint",
+      "drink"
+    ],
+    "image": "https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?auto=format&fit=crop&w=1100&q=88"
+  }
+]

@@ -1,0 +1,72 @@
+name: Deploy FoodieHub to GitHub Pages
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: github-pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Configure GitHub Pages
+        uses: actions/configure-pages@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install API dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Check source and menu data
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm run check
+          node -e "JSON.parse(require('fs').readFileSync('data/menu.json', 'utf8'))"
+
+      - name: Run backend tests
+        run: npm test
+
+      - name: Prepare static website
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p _site/assets _site/data
+          cp index.html _site/
+          cp FoodieHub_Logo_Dark.svg FoodieHub_Logo_Light.svg FoodieHub_Logo_Icon.svg _site/
+          cp -R assets/css assets/js _site/assets/
+          cp data/menu.json _site/data/
+          touch _site/.nojekyll
+          test -s _site/index.html
+          test -s _site/assets/css/styles.css
+          test -s _site/assets/js/app.js
+          test -s _site/assets/js/validation.js
+          test -s _site/data/menu.json
+
+      - name: Upload website artifact
+        uses: actions/upload-pages-artifact@v4
+        with:
+          path: _site
+
+      - name: Deploy website
+        id: deployment
+        uses: actions/deploy-pages@v4

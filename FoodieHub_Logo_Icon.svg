@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+<title id="title">FoodieHub icon</title>
+<rect x="1" y="1" width="62" height="62" rx="18" fill="#17120D"/>
+<circle cx="32" cy="33" r="27" fill="none" stroke="#D99A45" stroke-opacity=".48" stroke-width="1.5"/>
+<path d="M20.5 29.5C15.8 25 22.2 19.8 20.8 14.4M32 28.5C25.9 21.8 35.4 17.5 31.9 9.7M43.5 29.5C38.8 25 45.2 20.3 43.8 15.2" fill="none" stroke="#F0C987" stroke-width="2.7" stroke-linecap="round"/>
+<path d="M32 28.5C25.9 21.8 35.4 17.5 31.9 9.7" fill="none" stroke="#E78A31" stroke-width="3.2" stroke-linecap="round"/>
+<path d="M13.5 35.5H50.5M16.8 36.4C19.2 47.5 25.2 52.6 32 52.6C38.8 52.6 44.8 47.5 47.2 36.4M24.8 55.7H39.2" fill="none" stroke="#F0C987" stroke-width="2.9" stroke-linecap="round"/>
+<path d="M50.6 12.4L52.1 16.1L55.8 17.6L52.1 19.1L50.6 22.8L49.1 19.1L45.4 17.6L49.1 16.1Z" fill="#EFC477"/>
+</svg>
