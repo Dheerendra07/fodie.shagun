@@ -147,6 +147,7 @@
 
   async function refreshCustomerData() {
     if (!state.customerToken) return;
+    state.accountLoadError = "";
     const [ordersResult, addressesResult] = await Promise.allSettled([
       request("/api/auth/orders"),
       request("/api/auth/addresses")

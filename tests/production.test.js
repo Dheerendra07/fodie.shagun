@@ -23,7 +23,7 @@ async function fixture(t) {
   const app = express();
   app.use(express.json());
   const db = new Database(":memory:");
-  db.exec("CREATE TABLE orders (order_number TEXT PRIMARY KEY, created_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'confirmed', payment_status TEXT NOT NULL DEFAULT 'pending', items_json TEXT NOT NULL DEFAULT '[]', gateway_order_id TEXT, total REAL, coupon_code TEXT); CREATE TABLE subscribers (email TEXT PRIMARY KEY, created_at TEXT NOT NULL);");
+  db.exec("CREATE TABLE orders (order_number TEXT PRIMARY KEY, created_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'confirmed', payment_status TEXT NOT NULL DEFAULT 'pending', items_json TEXT NOT NULL DEFAULT '[]', subtotal REAL NOT NULL DEFAULT 0, coupon_code TEXT, coupon_discount REAL NOT NULL DEFAULT 0, delivery_fee REAL NOT NULL DEFAULT 0, tax REAL NOT NULL DEFAULT 0, total REAL, payment_method TEXT NOT NULL DEFAULT 'cod', gateway_order_id TEXT); CREATE TABLE subscribers (email TEXT PRIMARY KEY, created_at TEXT NOT NULL);");
   const menu = [{ id: "test-bowl", name: "Test Bowl", category: "Bowls", price: 200, originalPrice: 250, isVeg: true, description: "Test item", prepTime: 15, tags: [] }];
   const productById = new Map(menu.map(item => [item.id, item]));
   let backend;
