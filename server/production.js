@@ -6,6 +6,7 @@ const scryptAsync = promisify(crypto.scrypt);
 const rateLimitPackage = require("express-rate-limit");
 const rateLimit = rateLimitPackage.rateLimit || rateLimitPackage;
 const validation = require("./validation");
+const paymentLifecycle = require("./payment-lifecycle");
 const PASSWORD_KEY_LENGTH = 64;
 const PASSWORD_COST = 16384;
 const PASSWORD_MAXMEM = 64 * 1024 * 1024;
@@ -922,43 +923,30 @@ function createProductionBackend(options) {
         audit("system", "payment.webhook_amount_mismatch", "order", row.order_number, { event, eventAmount, eventCurrency });
         return res.status(202).json({ received: true, ignored: true });
       }
-      if (["failed", "cancelled"].includes(row.status)) {
+      const captureState = paymentLifecycle.applyPaymentCapture(db, { consumeInventory }, row.order_number, payment.id || null);
+      if (captureState === "refund_required") {
         try {
           if (payment.id && typeof razorpayRequest === "function") {
             await razorpayRequest("/payments/" + encodeURIComponent(payment.id) + "/refund", {
               method: "POST", body: { amount: Math.round(Number(row.total) * 100), notes: { foodiehub_order_number: row.order_number, reason: "Order reservation expired or order cancelled" } }
             });
-            db.prepare("UPDATE orders SET payment_status = 'refunded', status = 'cancelled', razorpay_payment_id = ? WHERE order_number = ?")
+            db.prepare("UPDATE orders SET payment_status = 'refunded', status = 'cancelled', razorpay_payment_id = ? WHERE order_number = ? AND payment_status IN ('failed', 'expired', 'refund_required')")
               .run(payment.id, row.order_number);
             audit("system", "payment.late_capture_refunded", "order", row.order_number);
           } else {
-            db.prepare("UPDATE orders SET payment_status = 'refund_required' WHERE order_number = ?").run(row.order_number);
+            db.prepare("UPDATE orders SET payment_status = 'refund_required' WHERE order_number = ? AND payment_status IN ('failed', 'expired', 'refund_required')")
+              .run(row.order_number);
           }
         } catch (error) {
-          db.prepare("UPDATE orders SET payment_status = 'refund_required' WHERE order_number = ?").run(row.order_number);
+          db.prepare("UPDATE orders SET payment_status = 'refund_required', razorpay_payment_id = ? WHERE order_number = ? AND payment_status IN ('failed', 'expired', 'refund_required')")
+            .run(payment.id || null, row.order_number);
           audit("system", "payment.refund_required", "order", row.order_number, { message: error.message });
         }
-      } else {
-        const tx = db.transaction(() => {
-          db.prepare("UPDATE orders SET payment_status = 'paid', status = CASE WHEN status = 'payment_pending' THEN 'confirmed' ELSE status END, razorpay_payment_id = ? WHERE order_number = ?")
-            .run(payment.id || null, row.order_number);
-          consumeInventory(row.order_number);
-        });
-        tx();
+      } else if (!["confirmed", "already_paid", "already_refunded"].includes(captureState)) {
+        audit("system", "payment.capture_state_ignored", "order", row.order_number, { event, captureState });
       }
     } else if (row && event === "payment.failed") {
-      const tx = db.transaction(() => {
-        const failed = db.prepare([
-          "UPDATE orders SET payment_status = 'failed', status = 'failed'",
-          "WHERE order_number = ? AND status = 'payment_pending'",
-          "AND payment_status IN ('created', 'authorized', 'pending')"
-        ].join(" ")).run(row.order_number);
-        if (!failed.changes) return false;
-        releaseInventory(row.order_number);
-        releaseCoupon(row.order_number);
-        return true;
-      });
-      tx();
+      paymentLifecycle.applyPaymentFailure(db, { releaseInventory, releaseCoupon }, row.order_number);
     }
     return res.json({ received: true });
   });

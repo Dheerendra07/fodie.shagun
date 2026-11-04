@@ -5,6 +5,7 @@ const crypto = require("node:crypto");
 const express = require("express");
 const Database = require("better-sqlite3");
 const createProductionBackend = require("../server/production");
+const paymentLifecycle = require("../server/payment-lifecycle");
 
 async function fixture(t) {
   const old = {
@@ -327,6 +328,43 @@ test("reservation expiry never releases inventory for an already-paid payment st
   assert.equal(db.prepare("SELECT quantity FROM inventory WHERE product_id = 'test-bowl'").get().quantity, 3);
   assert.equal(db.prepare("SELECT status FROM order_inventory WHERE order_number = ?").get(orderNumber).status, "held");
   assert.equal(db.prepare("SELECT used_count FROM coupons WHERE code = 'FOOD25'").get().used_count, 1);
+});
+
+test("payment capture and failure transitions are conditional and idempotent", async t => {
+  const { backend, db } = await fixture(t);
+  const orderNumber = "FH-LIFECYCLE-TEST";
+  db.prepare("UPDATE inventory SET quantity = 5 WHERE product_id = 'test-bowl'").run();
+  backend.reserveInventory(orderNumber, [{ productId: "test-bowl", quantity: 2 }], 20);
+  backend.claimCoupon("FOOD25", orderNumber);
+  db.prepare("INSERT INTO orders (order_number, created_at, status, payment_status, items_json, total, coupon_code) VALUES (?, ?, 'payment_pending', 'created', '[]', 200, 'FOOD25')")
+    .run(orderNumber, new Date().toISOString());
+
+  assert.equal(paymentLifecycle.applyPaymentCapture(db, backend, orderNumber, "pay_lifecycle_1"), "confirmed");
+  assert.equal(paymentLifecycle.applyPaymentCapture(db, backend, orderNumber, "pay_lifecycle_1"), "already_paid");
+  assert.equal(paymentLifecycle.applyPaymentFailure(db, backend, orderNumber), "already_paid");
+  assert.equal(db.prepare("SELECT status FROM orders WHERE order_number = ?").get(orderNumber).status, "confirmed");
+  assert.equal(db.prepare("SELECT payment_status FROM orders WHERE order_number = ?").get(orderNumber).payment_status, "paid");
+  assert.equal(db.prepare("SELECT quantity FROM inventory WHERE product_id = 'test-bowl'").get().quantity, 3);
+  assert.equal(db.prepare("SELECT status FROM order_inventory WHERE order_number = ?").get(orderNumber).status, "consumed");
+  assert.equal(db.prepare("SELECT used_count FROM coupons WHERE code = 'FOOD25'").get().used_count, 1);
+});
+
+test("payment failure releases pending reservations once and late capture requests refund", async t => {
+  const { backend, db } = await fixture(t);
+  const orderNumber = "FH-LATE-CAPTURE";
+  db.prepare("UPDATE inventory SET quantity = 5 WHERE product_id = 'test-bowl'").run();
+  backend.reserveInventory(orderNumber, [{ productId: "test-bowl", quantity: 2 }], 20);
+  backend.claimCoupon("FOOD25", orderNumber);
+  db.prepare("INSERT INTO orders (order_number, created_at, status, payment_status, items_json, total, coupon_code) VALUES (?, ?, 'payment_pending', 'created', '[]', 200, 'FOOD25')")
+    .run(orderNumber, new Date().toISOString());
+
+  assert.equal(paymentLifecycle.applyPaymentFailure(db, backend, orderNumber), "failed");
+  assert.equal(paymentLifecycle.applyPaymentFailure(db, backend, orderNumber), "unchanged");
+  assert.equal(paymentLifecycle.applyPaymentCapture(db, backend, orderNumber, "pay_late_capture"), "refund_required");
+  assert.equal(db.prepare("SELECT status FROM orders WHERE order_number = ?").get(orderNumber).status, "failed");
+  assert.equal(db.prepare("SELECT quantity FROM inventory WHERE product_id = 'test-bowl'").get().quantity, 5);
+  assert.equal(db.prepare("SELECT status FROM order_inventory WHERE order_number = ?").get(orderNumber).status, "released");
+  assert.equal(db.prepare("SELECT used_count FROM coupons WHERE code = 'FOOD25'").get().used_count, 0);
 });
 
 test("late payment.failed webhook cannot release inventory or coupons for a paid order", async t => {

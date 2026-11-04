@@ -10,6 +10,7 @@ const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
 const validation = require("./validation");
+const paymentLifecycle = require("./payment-lifecycle");
 
 const app = express();
 const ROOT = path.resolve(__dirname, "..");
@@ -380,7 +381,8 @@ app.post("/api/payments/create-order", async (req, res, next) => {
       method: "POST",
       body: { amount: Math.round(bill.total * 100), currency: "INR", receipt: orderNumber, notes: { foodiehub_order_number: orderNumber } }
     });
-    if (!gatewayOrder.id || Number(gatewayOrder.amount) !== Math.round(bill.total * 100)) {
+    if (!gatewayOrder.id || Number(gatewayOrder.amount) !== Math.round(bill.total * 100) ||
+        String(gatewayOrder.currency || "").toUpperCase() !== "INR") {
       const error = new Error("The payment provider returned an invalid order. Please try again.");
       error.status = 502;
       throw error;
@@ -418,12 +420,8 @@ app.post("/api/payments/verify", async (req, res, next) => {
         !/^[a-f0-9]{64}$/i.test(signature)) {
       return res.status(400).json({ error: "The payment confirmation details are incomplete or invalid." });
     }
-    const row = db.prepare("SELECT order_number, gateway_order_id, total, payment_status, status FROM orders WHERE gateway_order_id = ?").get(orderId);
+    const row = db.prepare("SELECT order_number, gateway_order_id, total, payment_status, status, razorpay_payment_id FROM orders WHERE gateway_order_id = ?").get(orderId);
     if (!row) return res.status(404).json({ error: "The FoodieHub order for this payment could not be found." });
-    if (row.payment_status === "paid") return res.json({
-      orderNumber: row.order_number, status: "confirmed", total: row.total, paymentStatus: "paid",
-      paymentMethod: "razorpay", message: "This payment was already verified."
-    });
     const expected = crypto.createHmac("sha256", process.env.RAZORPAY_KEY_SECRET)
       .update(row.gateway_order_id + "|" + paymentId).digest("hex");
     const expectedBuffer = Buffer.from(expected, "hex");
@@ -432,51 +430,77 @@ app.post("/api/payments/verify", async (req, res, next) => {
       return res.status(400).json({ error: "Payment signature verification failed. The order has not been confirmed." });
     }
     let payment = await razorpayRequest("/payments/" + encodeURIComponent(paymentId));
-    if (payment.order_id !== row.gateway_order_id || Number(payment.amount) !== Math.round(Number(row.total) * 100)) {
-      return res.status(400).json({ error: "The payment amount or order does not match this FoodieHub order." });
+    const expectedAmount = Math.round(Number(row.total) * 100);
+    const paymentMatchesOrder = candidate => candidate &&
+      candidate.order_id === row.gateway_order_id &&
+      Number(candidate.amount) === expectedAmount &&
+      String(candidate.currency || "").toUpperCase() === "INR" &&
+      (!candidate.id || candidate.id === paymentId);
+    if (!paymentMatchesOrder(payment)) {
+      return res.status(400).json({ error: "The payment currency, amount or order does not match this FoodieHub order." });
+    }
+
+    const latest = paymentLifecycle.getPaymentState(db, row.order_number);
+    if (!latest) return res.status(404).json({ error: "The FoodieHub order for this payment could not be found." });
+    if (latest.payment_status === "paid") {
+      if (latest.razorpay_payment_id !== paymentId) {
+        return res.status(409).json({ error: "A different payment has already been recorded for this order. Please contact support before retrying." });
+      }
+      return res.json({
+        orderNumber: row.order_number, status: latest.status, total: row.total, paymentStatus: "paid",
+        paymentMethod: "razorpay", message: "This payment was already verified."
+      });
     }
     if (payment.status === "failed") {
-      const failPayment = db.transaction(() => {
-        db.prepare("UPDATE orders SET payment_status = 'failed', status = 'failed' WHERE order_number = ?").run(row.order_number);
-        production.releaseInventory(row.order_number);
-        production.releaseCoupon(row.order_number);
-      });
-      failPayment();
-      return res.status(409).json({ error: "The payment failed. Your reserved items have been released. Please try checkout again." });
-    }
-    if (["failed", "cancelled"].includes(row.status)) {
-      if (payment.status === "captured" || payment.captured === true) {
-        try {
-          await razorpayRequest("/payments/" + encodeURIComponent(paymentId) + "/refund", {
-            method: "POST",
-            body: { amount: Math.round(Number(row.total) * 100), notes: { foodiehub_order_number: row.order_number, reason: "The order reservation expired or was cancelled." } }
-          });
-          db.prepare("UPDATE orders SET payment_status = 'refunded', status = 'cancelled', razorpay_payment_id = ? WHERE order_number = ?").run(paymentId, row.order_number);
-          production.audit("system", "payment.late_capture_refunded", "order", row.order_number);
-          return res.status(409).json({ error: "The order reservation expired. The captured payment has been sent for refund; please do not retry this checkout." });
-        } catch (refundError) {
-          db.prepare("UPDATE orders SET payment_status = 'refund_required', razorpay_payment_id = ? WHERE order_number = ?").run(paymentId, row.order_number);
-          production.audit("system", "payment.refund_required", "order", row.order_number, { message: refundError.message });
-          return res.status(409).json({ error: "This payment was captured after the order expired and needs support review. Do not retry the payment." });
-        }
+      const failureState = paymentLifecycle.applyPaymentFailure(db, production, row.order_number);
+      if (failureState === "failed") {
+        return res.status(409).json({ error: "The payment failed. Your reserved items have been released. Please try checkout again." });
       }
-      return res.status(409).json({ error: "This order has expired or was cancelled. Please start a new checkout." });
+      return res.status(409).json({ error: "The order payment state changed while verification was in progress. Refresh the order status before retrying." });
     }
+
     if (payment.status === "authorized" && !payment.captured) {
+      const beforeCapture = paymentLifecycle.getPaymentState(db, row.order_number);
+      if (!beforeCapture || beforeCapture.status !== "payment_pending" ||
+          !["created", "authorized", "pending"].includes(beforeCapture.payment_status)) {
+        return res.status(409).json({ error: "This order is no longer awaiting payment. Please refresh the order status." });
+      }
       payment = await razorpayRequest("/payments/" + encodeURIComponent(paymentId) + "/capture", {
-        method: "POST", body: { amount: Math.round(Number(row.total) * 100), currency: "INR" }
+        method: "POST", body: { amount: expectedAmount, currency: "INR" }
       });
+      if (!paymentMatchesOrder(payment)) {
+        return res.status(502).json({ error: "The captured payment details did not match this order. Please contact support before retrying." });
+      }
     }
     if (payment.status !== "captured" && payment.captured !== true) {
       return res.status(409).json({ error: "Payment is authorised but not captured yet. The order is still pending; contact support before retrying." });
     }
-    const confirmPayment = db.transaction(() => {
-      db.prepare("UPDATE orders SET payment_status = 'paid', status = 'confirmed', razorpay_payment_id = ? WHERE order_number = ?").run(paymentId, row.order_number);
-      production.consumeInventory(row.order_number);
-    });
-    confirmPayment();
+
+    const captureState = paymentLifecycle.applyPaymentCapture(db, production, row.order_number, paymentId);
+    if (captureState === "refund_required") {
+      try {
+        await razorpayRequest("/payments/" + encodeURIComponent(paymentId) + "/refund", {
+          method: "POST",
+          body: { amount: expectedAmount, notes: { foodiehub_order_number: row.order_number, reason: "The order reservation expired or was cancelled." } }
+        });
+        db.prepare("UPDATE orders SET payment_status = 'refunded', status = 'cancelled', razorpay_payment_id = ? WHERE order_number = ? AND payment_status IN ('failed', 'expired', 'refund_required')").run(paymentId, row.order_number);
+        production.audit("system", "payment.late_capture_refunded", "order", row.order_number);
+        return res.status(409).json({ error: "The order reservation expired. The captured payment has been sent for refund; please do not retry this checkout." });
+      } catch (refundError) {
+        db.prepare("UPDATE orders SET payment_status = 'refund_required', razorpay_payment_id = ? WHERE order_number = ? AND payment_status IN ('failed', 'expired', 'refund_required')").run(paymentId, row.order_number);
+        production.audit("system", "payment.refund_required", "order", row.order_number, { message: refundError.message });
+        return res.status(409).json({ error: "This payment was captured after the order expired and needs support review. Do not retry the payment." });
+      }
+    }
+    if (captureState !== "confirmed" && captureState !== "already_paid") {
+      return res.status(409).json({ error: "The order payment state changed while verification was in progress. Refresh the order status before retrying." });
+    }
+    const confirmed = paymentLifecycle.getPaymentState(db, row.order_number);
+    if (!confirmed || confirmed.payment_status !== "paid" || confirmed.razorpay_payment_id !== paymentId) {
+      return res.status(409).json({ error: "A different payment has already been recorded for this order. Please contact support before retrying." });
+    }
     return res.json({
-      orderNumber: row.order_number, status: "confirmed", total: row.total, paymentStatus: "paid",
+      orderNumber: row.order_number, status: confirmed.status, total: row.total, paymentStatus: "paid",
       paymentMethod: "razorpay", message: "Payment captured and verified securely. Your order is confirmed."
     });
   } catch (error) { return next(error); }
