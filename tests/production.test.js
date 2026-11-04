@@ -141,6 +141,23 @@ test("customer order history and saved addresses are isolated by account ownersh
   }, firstAccount.token);
   assert.equal(saved.status, 201);
   const savedAddress = await saved.json();
+  const duplicateAddress = await post(base, "/api/auth/addresses", {
+    label: "Home", address: validAddressFixture()
+  }, firstAccount.token);
+  assert.equal(duplicateAddress.status, 200);
+  assert.equal((await duplicateAddress.json()).id, savedAddress.id);
+
+  for (let i = 1; i < 20; i++) {
+    const address = validAddressFixture();
+    address.house = "B-" + (204 + i);
+    const response = await post(base, "/api/auth/addresses", { label: "Home", address }, firstAccount.token);
+    assert.equal(response.status, 201);
+  }
+  const overLimitAddress = validAddressFixture();
+  overLimitAddress.house = "B-999";
+  const overLimit = await post(base, "/api/auth/addresses", { label: "Home", address: overLimitAddress }, firstAccount.token);
+  assert.equal(overLimit.status, 409);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM user_addresses WHERE user_id = ?").get(firstAccount.user.id).count, 20);
 
   const secondAddresses = await fetch(base + "/api/auth/addresses", {
     headers: { Authorization: "Bearer " + secondAccount.token }
@@ -155,7 +172,7 @@ test("customer order history and saved addresses are isolated by account ownersh
   const firstAddresses = await fetch(base + "/api/auth/addresses", {
     headers: { Authorization: "Bearer " + firstAccount.token }
   });
-  assert.equal((await firstAddresses.json()).addresses.length, 1);
+  assert.equal((await firstAddresses.json()).addresses.length, 20);
 });
 
 test("coupon validation is database-backed and usage can be released", async t => {
@@ -412,6 +429,55 @@ test("payment failure releases pending reservations once and late capture reques
   assert.equal(db.prepare("SELECT quantity FROM inventory WHERE product_id = 'test-bowl'").get().quantity, 5);
   assert.equal(db.prepare("SELECT status FROM order_inventory WHERE order_number = ?").get(orderNumber).status, "released");
   assert.equal(db.prepare("SELECT used_count FROM coupons WHERE code = 'FOOD25'").get().used_count, 0);
+});
+
+test("unmatched payment webhooks remain retryable until the checkout order is persisted", async t => {
+  const { base, db, backend } = await fixture(t);
+  const secret = "foodiehub-webhook-test-secret";
+  process.env.RAZORPAY_WEBHOOK_SECRET = secret;
+  const orderNumber = "FH-ORPHAN123";
+  const gatewayOrderId = "order_orphan_delivery";
+  db.prepare("UPDATE inventory SET quantity = 5 WHERE product_id = 'test-bowl'").run();
+
+  const payload = {
+    event: "payment.captured",
+    payload: { payment: { entity: {
+      id: "pay_orphan_capture", order_id: gatewayOrderId, amount: 20000,
+      currency: "INR", status: "captured", captured: true
+    } } }
+  };
+  const rawBody = JSON.stringify(payload);
+  const signature = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+  const sendWebhook = () => fetch(base + "/api/payments/webhook", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-razorpay-signature": signature,
+      "x-razorpay-event-id": "evt_order_save_race"
+    },
+    body: rawBody
+  });
+
+  const early = await sendWebhook();
+  assert.equal(early.status, 409);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM webhook_events WHERE event_id = ?").get("evt_order_save_race").count, 0);
+
+  backend.reserveInventory(orderNumber, [{ productId: "test-bowl", quantity: 2 }], 20);
+  backend.claimCoupon("FOOD25", orderNumber);
+  db.prepare("INSERT INTO orders (order_number, created_at, status, payment_status, items_json, gateway_order_id, total, coupon_code) VALUES (?, ?, 'payment_pending', 'created', '[]', ?, 200, 'FOOD25')")
+    .run(orderNumber, new Date().toISOString(), gatewayOrderId);
+
+  const retried = await sendWebhook();
+  assert.equal(retried.status, 200);
+  assert.equal(db.prepare("SELECT status FROM orders WHERE order_number = ?").get(orderNumber).status, "confirmed");
+  assert.equal(db.prepare("SELECT payment_status FROM orders WHERE order_number = ?").get(orderNumber).payment_status, "paid");
+  assert.equal(db.prepare("SELECT quantity FROM inventory WHERE product_id = 'test-bowl'").get().quantity, 3);
+  assert.equal(db.prepare("SELECT used_count FROM coupons WHERE code = 'FOOD25'").get().used_count, 1);
+
+  const duplicate = await sendWebhook();
+  assert.equal(duplicate.status, 200);
+  assert.equal((await duplicate.json()).duplicate, true);
+  assert.equal(db.prepare("SELECT quantity FROM inventory WHERE product_id = 'test-bowl'").get().quantity, 3);
 });
 
 test("late payment.failed webhook cannot release inventory or coupons for a paid order", async t => {

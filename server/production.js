@@ -389,9 +389,24 @@ function createProductionBackend(options) {
     } catch (error) {
       return res.status(400).json({ error: error.message });
     }
+    const addressJson = JSON.stringify(address);
     const id = crypto.randomUUID();
-    db.prepare("INSERT INTO user_addresses (id, user_id, label, address_json, created_at) VALUES (?, ?, ?, ?, ?)")
-      .run(id, req.user.id, label, JSON.stringify(address), now());
+    const saveAddress = db.transaction(() => {
+      const existing = db.prepare("SELECT id, label, address_json, created_at FROM user_addresses WHERE user_id = ? AND address_json = ? ORDER BY created_at DESC LIMIT 1")
+        .get(req.user.id, addressJson);
+      if (existing) return { kind: "existing", row: existing };
+      const count = db.prepare("SELECT COUNT(*) AS count FROM user_addresses WHERE user_id = ?").get(req.user.id).count;
+      if (count >= 20) return { kind: "limit" };
+      db.prepare("INSERT INTO user_addresses (id, user_id, label, address_json, created_at) VALUES (?, ?, ?, ?, ?)")
+        .run(id, req.user.id, label, addressJson, now());
+      return { kind: "created" };
+    }).immediate();
+    if (saveAddress.kind === "limit") return res.status(409).json({ error: "You can save up to 20 delivery addresses. Remove an old address before adding another." });
+    if (saveAddress.kind === "existing") return res.status(200).json({
+      id: saveAddress.row.id, label: saveAddress.row.label,
+      address: JSON.parse(saveAddress.row.address_json),
+      createdAt: saveAddress.row.created_at, existing: true
+    });
     return res.status(201).json({ id, label, address });
   });
 
@@ -904,17 +919,23 @@ function createProductionBackend(options) {
       return res.status(400).json({ error: "Webhook signature verification failed." });
     }
     const eventId = String(req.get("x-razorpay-event-id") || crypto.createHash("sha256").update(rawBody).digest("hex"));
+    if (!/^[A-Za-z0-9_-]{1,200}$/.test(eventId)) {
+      return res.status(400).json({ error: "Webhook event ID is invalid." });
+    }
     const event = String((req.body || {}).event || "unknown");
-    const saved = db.prepare("INSERT OR IGNORE INTO webhook_events (event_id, event_type, received_at) VALUES (?, ?, ?)")
-      .run(eventId, event, now());
-    if (!saved.changes) return res.json({ received: true, duplicate: true });
-
     const payload = (req.body || {}).payload || {};
     const payment = payload.payment && payload.payment.entity ? payload.payment.entity : {};
     const paymentOrderId = payment.order_id || (payload.order && payload.order.entity && payload.order.entity.id);
-    const row = paymentOrderId
+    const row = typeof paymentOrderId === "string"
       ? db.prepare("SELECT order_number, status, payment_status, total FROM orders WHERE gateway_order_id = ?").get(paymentOrderId)
       : null;
+    const isPaymentLifecycleEvent = ["payment.captured", "order.paid", "payment.failed"].includes(event);
+    if (isPaymentLifecycleEvent && !row) {
+      return res.status(409).json({ error: "The FoodieHub order is not available yet. Please retry this webhook." });
+    }
+    const saved = db.prepare("INSERT OR IGNORE INTO webhook_events (event_id, event_type, received_at) VALUES (?, ?, ?)")
+      .run(eventId, event, now());
+    if (!saved.changes) return res.json({ received: true, duplicate: true });
 
     const eventAmount = Number(payment.amount || (payload.order && payload.order.entity && payload.order.entity.amount) || 0);
     const eventCurrency = String(payment.currency || (payload.order && payload.order.entity && payload.order.entity.currency) || "").toUpperCase();

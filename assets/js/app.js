@@ -455,6 +455,18 @@
       return;
     }
     if (state.customer) {
+      const accountName = inputValidation.name(checked.value.name, true);
+      const accountPhone = inputValidation.phone(checked.value.phone, true);
+      if (typeof accountName !== "string" || accountName.startsWith("Full name ")) {
+        $("#profileError").textContent = typeof accountName === "string" ? accountName : "Enter your full name.";
+        formElement.elements.namedItem("name").focus();
+        return;
+      }
+      if (typeof accountPhone !== "string" || accountPhone.startsWith("Enter ") || accountPhone.startsWith("Mobile number ")) {
+        $("#profileError").textContent = typeof accountPhone === "string" ? accountPhone : "Enter a valid mobile number.";
+        formElement.elements.namedItem("phone").focus();
+        return;
+      }
       const hasAddress = ADDRESS_FIELDS.some(field => checked.value.addressDetails[field]);
       if (hasAddress) {
         const completeAddress = inputValidation.address(checked.value.addressDetails, true);
