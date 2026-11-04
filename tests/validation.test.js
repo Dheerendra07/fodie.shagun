@@ -62,6 +62,20 @@ test("rejects unknown customer and address fields instead of silently ignoring t
   }), /unsupported fields: country/i);
 });
 
+test("allows only forward order lifecycle transitions and same-status retries", () => {
+  assert.equal(validation.canTransitionOrderStatus("confirmed", "preparing"), true);
+  assert.equal(validation.canTransitionOrderStatus("confirmed", "cancelled"), true);
+  assert.equal(validation.canTransitionOrderStatus("preparing", "out_for_delivery"), true);
+  assert.equal(validation.canTransitionOrderStatus("out_for_delivery", "delivered"), true);
+  assert.equal(validation.canTransitionOrderStatus("confirmed", "confirmed"), true);
+  assert.equal(validation.canTransitionOrderStatus("preparing", "confirmed"), false);
+  assert.equal(validation.canTransitionOrderStatus("confirmed", "delivered"), false);
+  assert.equal(validation.canTransitionOrderStatus("out_for_delivery", "cancelled"), false);
+  assert.equal(validation.canTransitionOrderStatus("delivered", "preparing"), false);
+  assert.equal(validation.canTransitionOrderStatus("payment_pending", "confirmed"), false);
+  assert.equal(validation.canTransitionOrderStatus("failed", "confirmed"), false);
+});
+
 test("validates address labels without silently truncating them", () => {
   assert.equal(validation.validateLabel("Home"), "Home");
   assert.throws(() => validation.validateLabel("A".repeat(31)), /1 to 30/i);

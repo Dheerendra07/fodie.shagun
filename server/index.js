@@ -610,10 +610,14 @@ app.patch("/api/admin/orders/:orderNumber", requireAdmin, (req, res) => {
   if (typeof status !== "string" || !allowedStatuses.includes(status)) return res.status(400).json({ error: "That order status is not supported." });
   const existing = db.prepare("SELECT status, payment_status FROM orders WHERE order_number = ?").get(orderNumber);
   if (!existing) return res.status(404).json({ error: "Order not found." });
+  if (status === existing.status) return res.json({ ok: true, orderNumber, status });
   if (existing.status === "delivered" || existing.status === "cancelled") return res.status(409).json({ error: "This order has already reached a final status." });
   if (status === "cancelled" && existing.payment_status === "paid") return res.status(409).json({ error: "This order has a captured online payment. Use the refund action instead of direct cancellation." });
   if (status === "cancelled" && ["preparing", "out_for_delivery"].includes(existing.status)) {
     return res.status(409).json({ error: "This order cannot be cancelled after kitchen preparation or dispatch has started." });
+  }
+  if (!validation.canTransitionOrderStatus(existing.status, status)) {
+    return res.status(409).json({ error: "Order status cannot move from " + existing.status.replace(/_/g, " ") + " to " + status.replace(/_/g, " ") + "." });
   }
   const updateOrder = db.transaction(() => {
     db.prepare("UPDATE orders SET status = ? WHERE order_number = ?").run(status, orderNumber);

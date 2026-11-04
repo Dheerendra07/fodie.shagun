@@ -18,6 +18,11 @@ const ADDRESS_FIELDS = Object.freeze([
 const REQUIRED_ADDRESS_FIELDS = Object.freeze([
   "house", "street", "area", "town", "city", "district", "state", "pincode"
 ]);
+const ORDER_STATUS_TRANSITIONS = Object.freeze({
+  confirmed: Object.freeze(["preparing", "cancelled"]),
+  preparing: Object.freeze(["out_for_delivery"]),
+  out_for_delivery: Object.freeze(["delivered"])
+});
 
 function invalid(message, status = 400) {
   const error = new Error(message);
@@ -150,6 +155,12 @@ function validateCustomer(input) {
   return { name, phone, email, address, addressDetails };
 }
 
+function canTransitionOrderStatus(current, next) {
+  if (typeof current !== "string" || typeof next !== "string") return false;
+  if (current === next) return true;
+  return Boolean(ORDER_STATUS_TRANSITIONS[current] && ORDER_STATUS_TRANSITIONS[current].includes(next));
+}
+
 function validateOrderNumber(value) {
   const number = cleanString(value, "Order number", { min: 11, max: 11 });
   if (!/^FH-[A-Z0-9]{8}$/.test(number.toUpperCase())) invalid("Enter a valid FoodieHub order number.");
@@ -186,6 +197,7 @@ module.exports = {
   normalizePhone,
   validateAddress,
   validateCustomer,
+  canTransitionOrderStatus,
   validateOrderNumber,
   validateLabel,
   validateEmail

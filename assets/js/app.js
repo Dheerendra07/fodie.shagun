@@ -1219,11 +1219,21 @@
     if(!orders.length){$("#adminOrdersBody").innerHTML='<tr><td colspan="5">No orders yet.</td></tr>';return;}
     $("#adminOrdersBody").innerHTML=orders.map(order=>{
       const number=order.order_number||order.orderNumber||"FH-UNKNOWN",name=order.customer_name||(order.customer&&order.customer.name)||"Demo customer",status=normalizeAdminStatus(order.status);
-      const choices=["confirmed","preparing","out_for_delivery","delivered","cancelled"],itemCount=Array.isArray(order.items)?order.items.reduce((sum,item)=>sum+Number(item.quantity||1),0):0;
+      const transitions={
+        confirmed:["confirmed","preparing","cancelled"],
+        preparing:["preparing","out_for_delivery"],
+        out_for_delivery:["out_for_delivery","delivered"],
+        delivered:["delivered"],
+        cancelled:["cancelled"],
+        payment_pending:["payment_pending"],
+        failed:["failed"]
+      };
+      const choices=transitions[status]||[status],locked=choices.length===1;
+      const itemCount=Array.isArray(order.items)?order.items.reduce((sum,item)=>sum+Number(item.quantity||1),0):0;
       const address=order.addressDetails||(order.customer&&order.customer.addressDetails)||{};
       const location=[...new Set([address.city,address.district,address.state].filter(Boolean))].join(", ");
       const postal=address.pincode||"";
-      return '<tr data-admin-row="'+escapeHTML(number)+'"><td><strong>'+escapeHTML(number)+'</strong><small>'+itemCount+' items</small></td><td>'+escapeHTML(name)+'<small>'+escapeHTML([location,postal].filter(Boolean).join(" · ")||"Address on file")+'</small></td><td>'+money(order.total)+'</td><td><select data-admin-status aria-label="Status for '+escapeHTML(number)+'">'+choices.map(choice=>'<option value="'+choice+'"'+(choice===status?" selected":"")+'>'+choice.replace(/_/g," ")+'</option>').join("")+'</select></td><td><button type="button" class="button button-outline admin-update-button" data-admin-update="'+escapeHTML(number)+'">Save</button></td></tr>';
+      return '<tr data-admin-row="'+escapeHTML(number)+'"><td><strong>'+escapeHTML(number)+'</strong><small>'+itemCount+' items</small></td><td>'+escapeHTML(name)+'<small>'+escapeHTML([location,postal].filter(Boolean).join(" · ")||"Address on file")+'</small></td><td>'+money(order.total)+'</td><td><select data-admin-status aria-label="Status for '+escapeHTML(number)+'"'+(locked?" disabled":"")+'">'+choices.map(choice=>'<option value="'+choice+'"'+(choice===status?" selected":"")+'>'+choice.replace(/_/g," ")+'</option>').join("")+'</select></td><td><button type="button" class="button button-outline admin-update-button" data-admin-update="'+escapeHTML(number)+'"'+(locked?" disabled":"")+'>Save</button></td></tr>';
     }).join("");
   }
   async function connectAdmin(event){
