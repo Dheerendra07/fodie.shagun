@@ -626,13 +626,16 @@ app.patch("/api/admin/orders/:orderNumber", requireAdmin, (req, res) => {
     return res.status(409).json({ error: "Order status cannot move from " + existing.status.replace(/_/g, " ") + " to " + status.replace(/_/g, " ") + "." });
   }
   const updateOrder = db.transaction(() => {
-    db.prepare("UPDATE orders SET status = ? WHERE order_number = ?").run(status, orderNumber);
+    const changed = db.prepare("UPDATE orders SET status = ? WHERE order_number = ? AND status = ?")
+      .run(status, orderNumber, existing.status);
+    if (!changed.changes) return false;
     if (status === "cancelled") {
       production.releaseInventory(orderNumber);
       production.releaseCoupon(orderNumber);
     }
+    return true;
   });
-  updateOrder();
+  if (!updateOrder()) return res.status(409).json({ error: "This order was updated by another admin. Refresh the dashboard and try again." });
   production.audit("admin", "order.status_changed", "order", orderNumber, { from: existing.status, to: status });
   return res.json({ ok: true, orderNumber, status });
 });

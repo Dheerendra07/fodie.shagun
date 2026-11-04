@@ -1228,7 +1228,7 @@
         payment_pending:["payment_pending"],
         failed:["failed"]
       };
-      const choices=transitions[status]||[status],locked=choices.length===1;
+      const choices=(transitions[status]||[status]).filter(choice=>!(choice==="cancelled"&&order.payment_status==="paid")),locked=choices.length===1;
       const itemCount=Array.isArray(order.items)?order.items.reduce((sum,item)=>sum+Number(item.quantity||1),0):0;
       const address=order.addressDetails||(order.customer&&order.customer.addressDetails)||{};
       const location=[...new Set([address.city,address.district,address.state].filter(Boolean))].join(", ");
