@@ -111,6 +111,53 @@ test("admin login issues a role-isolated revocable session", async t => {
   assert.equal(customerArea.status, 401);
 });
 
+test("customer order history and saved addresses are isolated by account ownership", async t => {
+  const { base, db } = await fixture(t);
+  const first = await post(base, "/api/auth/register", {
+    name: "First Customer", email: "first@example.test", phone: "9876543212", password: "CustomerTestPass123!"
+  });
+  const second = await post(base, "/api/auth/register", {
+    name: "Second Customer", email: "second@example.test", phone: "9876543213", password: "CustomerTestPass123!"
+  });
+  assert.equal(first.status, 201);
+  assert.equal(second.status, 201);
+  const firstAccount = await first.json();
+  const secondAccount = await second.json();
+
+  db.prepare("INSERT INTO orders (order_number, created_at, items_json, total, user_id) VALUES (?, ?, '[]', 200, ?)")
+    .run("FH-FIRST0001", new Date().toISOString(), firstAccount.user.id);
+  db.prepare("INSERT INTO orders (order_number, created_at, items_json, total, user_id) VALUES (?, ?, '[]', 300, ?)")
+    .run("FH-SECOND001", new Date().toISOString(), secondAccount.user.id);
+
+  const firstOrders = await fetch(base + "/api/auth/orders", {
+    headers: { Authorization: "Bearer " + firstAccount.token }
+  });
+  const firstPayload = await firstOrders.json();
+  assert.equal(firstOrders.status, 200);
+  assert.deepEqual(firstPayload.orders.map(order => order.orderNumber), ["FH-FIRST0001"]);
+
+  const saved = await post(base, "/api/auth/addresses", {
+    label: "Home", address: validAddressFixture()
+  }, firstAccount.token);
+  assert.equal(saved.status, 201);
+  const savedAddress = await saved.json();
+
+  const secondAddresses = await fetch(base + "/api/auth/addresses", {
+    headers: { Authorization: "Bearer " + secondAccount.token }
+  });
+  assert.equal(secondAddresses.status, 200);
+  assert.equal((await secondAddresses.json()).addresses.length, 0);
+
+  const crossAccountDelete = await fetch(base + "/api/auth/addresses/" + savedAddress.id, {
+    method: "DELETE", headers: { Authorization: "Bearer " + secondAccount.token }
+  });
+  assert.equal(crossAccountDelete.status, 404);
+  const firstAddresses = await fetch(base + "/api/auth/addresses", {
+    headers: { Authorization: "Bearer " + firstAccount.token }
+  });
+  assert.equal((await firstAddresses.json()).addresses.length, 1);
+});
+
 test("coupon validation is database-backed and usage can be released", async t => {
   const { backend, db } = await fixture(t);
   assert.equal(backend.calculateCoupon("FOOD25", 300).discount, 75);

@@ -2143,3 +2143,37 @@ body.welcome-open{overflow:hidden}
 @media(prefers-reduced-motion:reduce){
  .offer-slide,.offer-slide.is-active,.welcome-intro,.welcome-card,.welcome-mark,.welcome-progress span{transition:none!important;animation:none!important}
 }
+
+
+/* Account access: calm, accessible and consistent with the glass surface system */
+.account-access-panel {
+  display:flex;align-items:center;justify-content:space-between;gap:18px;
+  margin:18px 27px 0;padding:17px 18px;border:1px solid var(--glass-border);
+  border-radius:16px;background:var(--glass);box-shadow:var(--glass-shadow);
+}
+.account-access-panel > div:first-child { display:grid;gap:4px;min-width:0; }
+.account-panel-kicker { color:var(--orange-dark);font-size:9px;font-weight:900;letter-spacing:.13em; }
+.account-access-panel strong { color:var(--ink);font-size:14px;letter-spacing:-.02em; }
+.account-access-panel small { color:var(--muted);font-size:11px;line-height:1.5; }
+.account-access-actions { display:flex;flex:0 0 auto;gap:8px; }
+.account-access-actions .button { min-height:38px;padding:0 14px;font-size:11px; }
+.account-dialog { width:min(500px,calc(100% - 28px)); }
+.account-auth-body { padding:22px 27px 25px; }
+.account-mode-switch { display:grid;grid-template-columns:1fr 1fr;gap:5px;padding:5px;border:1px solid var(--glass-border);border-radius:13px;background:var(--glass); }
+.account-mode-switch button { min-height:40px;border:0;border-radius:9px;background:transparent;color:var(--muted);font:700 12px var(--sans);cursor:pointer; }
+.account-mode-switch button[aria-pressed="true"] { background:var(--glass-strong);color:var(--ink);box-shadow:0 3px 13px rgba(25,35,27,.09); }
+.account-auth-form { display:grid;gap:15px;padding-top:20px; }
+.account-auth-form[hidden] { display:none; }
+.account-auth-copy,.account-auth-footnote,.account-password-note { margin:0;color:var(--muted);font-size:12px;line-height:1.65; }
+.account-auth-form .form-field { font-size:12px; }
+.account-auth-form .form-field input { min-height:46px;font-size:14px; }
+.account-submit { width:100%;min-height:48px;margin-top:2px; }
+.account-auth-footnote { margin-top:18px;padding-top:15px;border-top:1px solid var(--glass-border);text-align:center; }
+.account-password-note { margin-top:-5px;font-size:11px; }
+:root[data-theme="dark"] .account-access-panel { background:var(--glass); }
+@media(max-width:760px) {
+  .account-access-panel { align-items:flex-start;flex-direction:column;margin:15px 18px 0;padding:15px; }
+  .account-access-actions { width:100%; }
+  .account-access-actions .button { flex:1; }
+  .account-auth-body { padding:18px; }
+}

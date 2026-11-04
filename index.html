@@ -15,10 +15,10 @@
   <link rel="preconnect" href="https://images.unsplash.com">
   <link rel="preconnect" href="https://images.pexels.com">
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=DM+Serif+Display&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="./assets/css/styles.css?v=payment-choice-fix-20261102">
+  <link rel="stylesheet" href="./assets/css/styles.css?v=account-flow-20261104">
   <script src="./assets/js/config.js"></script>
   <script defer src="./assets/js/validation.js?v=input-validation-20261103"></script>
-  <script defer src="./assets/js/app.js?v=input-validation-20261103"></script>
+  <script defer src="./assets/js/app.js?v=account-session-20261104"></script>
   <script type="application/ld+json">
   {
     "@context": "https://schema.org",
@@ -382,6 +382,13 @@
       <div><span class="drawer-kicker">YOUR FOODIEHUB SPACE</span><h2 id="profileTitle">Your profile.</h2></div>
       <button class="close-button" type="button" data-close-dialog="profileDialog" aria-label="Close profile">×</button>
     </div>
+    <section class="account-access-panel" aria-label="FoodieHub account">
+      <div><span class="account-panel-kicker" id="accountAccessEyebrow">FOODIEHUB ACCOUNT</span><strong id="accountAccessTitle">Your details, ready across sessions.</strong><small id="accountAccessDescription">Create an account to sync order history and saved addresses.</small></div>
+      <div class="account-access-actions">
+        <button class="button button-outline" id="accountSignInButton" type="button">Sign in / Join</button>
+        <button class="button button-outline" id="accountSignOutButton" type="button" hidden>Sign out</button>
+      </div>
+    </section>
     <form id="profileForm" class="checkout-form profile-form">
       <div class="profile-intro">
         <span class="profile-avatar" aria-hidden="true"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4.8 21a7.2 7.2 0 0 1 14.4 0"></path></svg></span>
@@ -414,13 +421,45 @@
       </div>
       <div class="address-preview" id="profileAddressPreview" aria-live="polite">Your complete delivery address will appear here as you fill in the details.</div>
       <p class="address-legacy-note" id="profileLegacyAddress" hidden></p>
-      <p class="profile-storage-note"><span aria-hidden="true">⌂</span> Profile and address are stored only in this browser. This is a demo profile, not a sign-in account.</p>
+      <p class="profile-storage-note" id="profileStorageNote"><span aria-hidden="true">⌂</span> Guest profile is stored only in this browser. Sign in to sync your order history.</p>
       <p class="form-error" id="profileError" role="alert"></p>
       <button class="button button-primary profile-save-button" type="submit">Save profile <span aria-hidden="true">✓</span></button>
       <p class="profile-message" id="profileMessage" aria-live="polite"></p>
     </form>
   </dialog>
 
+  <dialog class="site-dialog account-dialog" id="accountDialog" aria-labelledby="accountDialogTitle">
+    <div class="dialog-header">
+      <div><span class="drawer-kicker">YOUR FOODIEHUB ACCOUNT</span><h2 id="accountDialogTitle">Welcome back.</h2></div>
+      <button class="close-button" type="button" data-close-dialog="accountDialog" aria-label="Close account">×</button>
+    </div>
+    <div class="account-auth-body">
+      <div class="account-mode-switch" role="group" aria-label="Account access">
+        <button type="button" data-auth-mode="login" aria-pressed="true">Sign in</button>
+        <button type="button" data-auth-mode="register" aria-pressed="false">Create account</button>
+      </div>
+      <form id="customerLoginForm" class="account-auth-form">
+        <p class="account-auth-copy">Sign in to see your orders and saved delivery details across your sessions.</p>
+        <label class="form-field">Email address<input name="email" type="email" maxlength="254" autocomplete="username" placeholder="you@example.com" required></label>
+        <label class="form-field">Password<input name="password" type="password" minlength="1" maxlength="200" autocomplete="current-password" placeholder="Your password" required></label>
+        <p class="form-error" id="customerLoginError" role="alert"></p>
+        <button class="button button-primary account-submit" type="submit">Sign in securely <span aria-hidden="true">→</span></button>
+      </form>
+      <form id="customerRegisterForm" class="account-auth-form" hidden>
+        <p class="account-auth-copy">Create one account for your order history and delivery information. Guest checkout remains available too.</p>
+        <div class="form-grid">
+          <label class="form-field form-field-full">Full name<input name="name" type="text" minlength="2" maxlength="80" autocomplete="name" placeholder="Your full name" required></label>
+          <label class="form-field form-field-full">Email address<input name="email" type="email" maxlength="254" autocomplete="email" placeholder="you@example.com" required></label>
+          <label class="form-field form-field-full">Mobile number<input name="phone" type="tel" inputmode="tel" maxlength="18" autocomplete="tel" placeholder="10-digit mobile number" required></label>
+          <label class="form-field form-field-full">Password<input name="password" type="password" minlength="10" maxlength="200" autocomplete="new-password" placeholder="At least 10 characters" required></label>
+        </div>
+        <p class="account-password-note">Use 10–200 characters. Your password is stored as a one-way password hash.</p>
+        <p class="form-error" id="customerRegisterError" role="alert"></p>
+        <button class="button button-primary account-submit" type="submit">Create my account <span aria-hidden="true">→</span></button>
+      </form>
+      <p class="account-auth-footnote">Your account is optional. You can still place a guest order without signing in.</p>
+    </div>
+  </dialog>
 
   <dialog class="site-dialog dish-detail-dialog" id="dishDetailDialog" aria-labelledby="customizerTitle">
     <div class="customizer-hero">
