@@ -62,6 +62,16 @@ test("rejects unknown customer and address fields instead of silently ignoring t
   }), /unsupported fields: country/i);
 });
 
+test("normalizes coupon codes and rejects invalid formats or types", () => {
+  assert.equal(validation.normalizeCouponCode(" hub50 "), "HUB50");
+  assert.equal(validation.normalizeCouponCode(""), "");
+  assert.equal(validation.normalizeCouponCode(undefined), "");
+  assert.throws(() => validation.normalizeCouponCode(250), /must be text/i);
+  assert.throws(() => validation.normalizeCouponCode("AB"), /3 to 24/i);
+  assert.throws(() => validation.normalizeCouponCode("BAD CODE"), /unsupported characters/i);
+  assert.throws(() => validation.normalizeCouponCode("", true), /required/i);
+});
+
 test("allows only forward order lifecycle transitions and same-status retries", () => {
   assert.equal(validation.canTransitionOrderStatus("confirmed", "preparing"), true);
   assert.equal(validation.canTransitionOrderStatus("confirmed", "cancelled"), true);

@@ -101,7 +101,12 @@ function calculateCustomization(product, input) {
   const largePrice = category === "drinks" ? 30 : category === "desserts" ? 35 : category === "sides" ? 29 : 49;
   const largeName = category === "desserts" ? "Double treat" : "Large";
   const sizeOptions = { Regular: 0, [largeName]: largePrice };
-  const requestedSize = String(data.size || "Regular");
+  if (data.size !== undefined && data.size !== null && typeof data.size !== "string") {
+    const error = new Error("Serving size must be selected from the available options.");
+    error.status = 400;
+    throw error;
+  }
+  const requestedSize = typeof data.size === "string" && data.size.trim() ? data.size.trim() : "Regular";
   if (!Object.prototype.hasOwnProperty.call(sizeOptions, requestedSize)) {
     const error = new Error("One of the selected serving sizes is not available.");
     error.status = 400;
@@ -214,6 +219,7 @@ function calculateCustomization(product, input) {
   };
 }
 function calculateOrder(items, couponCode) {
+  const normalizedCouponCode = validation.normalizeCouponCode(couponCode, false);
   if (!Array.isArray(items) || items.length < 1 || items.length > 30) {
     const error = new Error("Add at least one menu item before placing an order.");
     error.status = 400;
@@ -259,7 +265,7 @@ function calculateOrder(items, couponCode) {
     });
   }
   subtotal = round(subtotal);
-  const coupon = calculateCoupon(couponCode, subtotal);
+  const coupon = calculateCoupon(normalizedCouponCode, subtotal);
   const deliveryFee = subtotal === 0 || subtotal >= 499 ? 0 : 39;
   const tax = round(Math.max(0, subtotal - coupon.discount) * 0.05);
   return {

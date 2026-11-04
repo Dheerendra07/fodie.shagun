@@ -167,6 +167,24 @@ function validateOrderNumber(value) {
   return number.toUpperCase();
 }
 
+function normalizeCouponCode(value, required = false) {
+  if (value === undefined || value === null || value === "") {
+    if (required) invalid("Coupon code is required.");
+    return "";
+  }
+  if (typeof value !== "string") invalid("Coupon code must be text.");
+  const trimmed = value.trim();
+  if (!trimmed) {
+    if (required) invalid("Coupon code is required.");
+    return "";
+  }
+  const code = cleanString(trimmed, "Coupon code", { min: 3, max: 24 });
+  if (!/^[A-Z0-9_-]{3,24}$/i.test(code)) {
+    invalid("Coupon code may contain only 3–24 letters, numbers, hyphens or underscores.");
+  }
+  return code.toUpperCase();
+}
+
 function validateLabel(value) {
   const label = cleanString(value, "Address label", { min: 1, max: 30 });
   if (!/^[\p{L}\p{M}\p{N}][\p{L}\p{M}\p{N} &'_-]*$/u.test(label)) {
@@ -198,6 +216,7 @@ module.exports = {
   validateAddress,
   validateCustomer,
   canTransitionOrderStatus,
+  normalizeCouponCode,
   validateOrderNumber,
   validateLabel,
   validateEmail

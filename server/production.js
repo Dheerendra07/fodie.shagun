@@ -411,8 +411,8 @@ function createProductionBackend(options) {
       if (typeof subtotal !== "number" || !Number.isFinite(subtotal) || subtotal < 0 || subtotal > 1000000) {
         return res.status(400).json({ error: "Enter a valid order subtotal." });
       }
-      if (typeof body.code !== "string" || body.code.length > 24) return res.status(400).json({ error: "Enter a valid coupon code." });
-      const result = calculateCoupon(body.code, subtotal);
+      const code = validation.normalizeCouponCode(body.code, true);
+      const result = calculateCoupon(code, subtotal);
       if (!result.code) return res.status(404).json({ error: "That coupon code is not available." });
       return res.json({ ...result, subtotal, discountedSubtotal: Math.max(0, subtotal - result.discount) });
     } catch (error) {
@@ -699,9 +699,7 @@ function createProductionBackend(options) {
   }
 
   function validateCouponCode(value) {
-    const code = validation.cleanString(value, "Coupon code", { min: 3, max: 24 });
-    if (!/^[A-Z0-9_-]{3,24}$/i.test(code)) throw httpError("Coupon code may contain only 3–24 letters, numbers, hyphens or underscores.");
-    return code.toUpperCase();
+    return validation.normalizeCouponCode(value, true);
   }
 
   app.post("/api/admin/coupons", requireAdmin, (req, res) => {
