@@ -1,6 +1,7 @@
 "use strict";
 const test = require("node:test");
 const assert = require("node:assert/strict");
+const crypto = require("node:crypto");
 const express = require("express");
 const Database = require("better-sqlite3");
 const createProductionBackend = require("../server/production");
@@ -10,6 +11,7 @@ async function fixture(t) {
     JWT_SECRET: process.env.JWT_SECRET,
     ADMIN_EMAIL: process.env.ADMIN_EMAIL,
     ADMIN_PASSWORD_HASH: process.env.ADMIN_PASSWORD_HASH,
+    RAZORPAY_WEBHOOK_SECRET: process.env.RAZORPAY_WEBHOOK_SECRET,
     NODE_ENV: process.env.NODE_ENV
   };
   process.env.NODE_ENV = "test";
@@ -19,7 +21,7 @@ async function fixture(t) {
   const app = express();
   app.use(express.json());
   const db = new Database(":memory:");
-  db.exec("CREATE TABLE orders (order_number TEXT PRIMARY KEY, created_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'confirmed', payment_status TEXT NOT NULL DEFAULT 'pending', items_json TEXT NOT NULL DEFAULT '[]'); CREATE TABLE subscribers (email TEXT PRIMARY KEY, created_at TEXT NOT NULL);");
+  db.exec("CREATE TABLE orders (order_number TEXT PRIMARY KEY, created_at TEXT NOT NULL, status TEXT NOT NULL DEFAULT 'confirmed', payment_status TEXT NOT NULL DEFAULT 'pending', items_json TEXT NOT NULL DEFAULT '[]', gateway_order_id TEXT, total REAL, coupon_code TEXT); CREATE TABLE subscribers (email TEXT PRIMARY KEY, created_at TEXT NOT NULL);");
   const menu = [{ id: "test-bowl", name: "Test Bowl", category: "Bowls", price: 200, originalPrice: 250, isVeg: true, description: "Test item", prepTime: 15, tags: [] }];
   const productById = new Map(menu.map(item => [item.id, item]));
   let backend;
@@ -231,4 +233,83 @@ test("admin menu, inventory and coupon APIs reject string coercion and invalid f
     minimumOrder: 200, maxDiscount: 80, maxUses: 10
   }, token);
   assert.equal(validCoupon.status, 201);
+});
+
+
+test("late payment.failed webhook cannot release inventory or coupons for a paid order", async t => {
+  const { base, db, backend } = await fixture(t);
+  const secret = "foodiehub-webhook-test-secret";
+  process.env.RAZORPAY_WEBHOOK_SECRET = secret;
+  const orderNumber = "FH-AB12CD34";
+  const gatewayOrderId = "order_paid_late_failure";
+
+  db.prepare("UPDATE inventory SET quantity = 5 WHERE product_id = 'test-bowl'").run();
+  backend.reserveInventory(orderNumber, [{ productId: "test-bowl", quantity: 2 }], null);
+  backend.consumeInventory(orderNumber);
+  backend.claimCoupon("FOOD25", orderNumber);
+  db.prepare("INSERT INTO orders (order_number, created_at, status, payment_status, items_json, gateway_order_id, total, coupon_code) VALUES (?, ?, 'confirmed', 'paid', '[]', ?, 200, 'FOOD25')")
+    .run(orderNumber, new Date().toISOString(), gatewayOrderId);
+
+  const payload = {
+    event: "payment.failed",
+    payload: { payment: { entity: {
+      id: "pay_late_failure", order_id: gatewayOrderId, amount: 20000, currency: "INR", status: "failed"
+    } } }
+  };
+  const rawBody = JSON.stringify(payload);
+  const signature = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+  const response = await fetch(base + "/api/payments/webhook", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-razorpay-signature": signature,
+      "x-razorpay-event-id": "evt_paid_then_failed"
+    },
+    body: rawBody
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(db.prepare("SELECT payment_status FROM orders WHERE order_number = ?").get(orderNumber).payment_status, "paid");
+  assert.equal(db.prepare("SELECT quantity FROM inventory WHERE product_id = 'test-bowl'").get().quantity, 3);
+  assert.equal(db.prepare("SELECT status FROM order_inventory WHERE order_number = ?").get(orderNumber).status, "consumed");
+  assert.equal(db.prepare("SELECT used_count FROM coupons WHERE code = 'FOOD25'").get().used_count, 1);
+});
+
+test("payment.failed webhook releases reservations only while checkout is pending", async t => {
+  const { base, db, backend } = await fixture(t);
+  const secret = "foodiehub-webhook-test-secret";
+  process.env.RAZORPAY_WEBHOOK_SECRET = secret;
+  const orderNumber = "FH-CD34EF56";
+  const gatewayOrderId = "order_pending_failure";
+
+  db.prepare("UPDATE inventory SET quantity = 5 WHERE product_id = 'test-bowl'").run();
+  backend.reserveInventory(orderNumber, [{ productId: "test-bowl", quantity: 2 }], 20);
+  backend.claimCoupon("FOOD25", orderNumber);
+  db.prepare("INSERT INTO orders (order_number, created_at, status, payment_status, items_json, gateway_order_id, total, coupon_code) VALUES (?, ?, 'payment_pending', 'created', '[]', ?, 200, 'FOOD25')")
+    .run(orderNumber, new Date().toISOString(), gatewayOrderId);
+
+  const payload = {
+    event: "payment.failed",
+    payload: { payment: { entity: {
+      id: "pay_pending_failure", order_id: gatewayOrderId, amount: 20000, currency: "INR", status: "failed"
+    } } }
+  };
+  const rawBody = JSON.stringify(payload);
+  const signature = crypto.createHmac("sha256", secret).update(rawBody).digest("hex");
+  const response = await fetch(base + "/api/payments/webhook", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "x-razorpay-signature": signature,
+      "x-razorpay-event-id": "evt_pending_failed"
+    },
+    body: rawBody
+  });
+
+  assert.equal(response.status, 200);
+  assert.equal(db.prepare("SELECT payment_status FROM orders WHERE order_number = ?").get(orderNumber).payment_status, "failed");
+  assert.equal(db.prepare("SELECT status FROM orders WHERE order_number = ?").get(orderNumber).status, "failed");
+  assert.equal(db.prepare("SELECT quantity FROM inventory WHERE product_id = 'test-bowl'").get().quantity, 5);
+  assert.equal(db.prepare("SELECT status FROM order_inventory WHERE order_number = ?").get(orderNumber).status, "released");
+  assert.equal(db.prepare("SELECT used_count FROM coupons WHERE code = 'FOOD25'").get().used_count, 0);
 });

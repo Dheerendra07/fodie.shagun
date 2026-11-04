@@ -918,9 +918,15 @@ function createProductionBackend(options) {
       }
     } else if (row && event === "payment.failed") {
       const tx = db.transaction(() => {
-        db.prepare("UPDATE orders SET payment_status = 'failed', status = 'failed' WHERE order_number = ? AND payment_status != 'paid'").run(row.order_number);
+        const failed = db.prepare([
+          "UPDATE orders SET payment_status = 'failed', status = 'failed'",
+          "WHERE order_number = ? AND status = 'payment_pending'",
+          "AND payment_status IN ('created', 'authorized', 'pending')"
+        ].join(" ")).run(row.order_number);
+        if (!failed.changes) return false;
         releaseInventory(row.order_number);
         releaseCoupon(row.order_number);
+        return true;
       });
       tx();
     }
