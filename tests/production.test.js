@@ -112,7 +112,9 @@ test("JWT tokens reject a modified signature", async () => {
   const secret = "this-is-a-long-test-signing-secret";
   const token = createProductionBackend.signToken({ sub: "user-1", role: "customer", exp: Math.floor(Date.now() / 1000) + 60 }, secret);
   assert.equal(createProductionBackend.verifyToken(token, secret).sub, "user-1");
-  const changed = token.slice(0, -1) + (token.endsWith("a") ? "b" : "a");
+  const parts = token.split(".");
+  parts[2] = (parts[2][0] === "A" ? "B" : "A") + parts[2].slice(1);
+  const changed = parts.join(".");
   assert.equal(createProductionBackend.verifyToken(changed, secret), null);
 });
 
