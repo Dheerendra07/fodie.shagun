@@ -72,6 +72,10 @@ test("customer registration creates a signed session and protected profile", asy
   const account = await created.json();
   assert.ok(account.token);
   assert.equal(account.user.email, "customer@example.test");
+  const duplicate = await post(base, "/api/auth/register", {
+    name: "Test Customer", email: "customer@example.test", phone: "9876543210", password: "CustomerTestPass123!"
+  });
+  assert.equal(duplicate.status, 409);
   const profile = await fetch(base + "/api/auth/me", { headers: { Authorization: "Bearer " + account.token } });
   assert.equal(profile.status, 200);
   assert.equal((await profile.json()).user.name, "Test Customer");
@@ -283,6 +287,47 @@ test("admin menu, inventory and coupon APIs reject string coercion and invalid f
   assert.equal(validCoupon.status, 201);
 });
 
+
+test("expired pending payment releases its inventory and coupon exactly once", async t => {
+  const { backend, db } = await fixture(t);
+  const orderNumber = "FH-EXPIRE-1234";
+  db.prepare("UPDATE inventory SET quantity = 5 WHERE product_id = 'test-bowl'").run();
+  backend.reserveInventory(orderNumber, [{ productId: "test-bowl", quantity: 2 }], 20);
+  backend.claimCoupon("FOOD25", orderNumber);
+  db.prepare("INSERT INTO orders (order_number, created_at, status, payment_status, items_json, total, coupon_code) VALUES (?, ?, 'payment_pending', 'created', '[]', 200, 'FOOD25')")
+    .run(orderNumber, new Date().toISOString());
+  db.prepare("UPDATE order_inventory SET expires_at = ? WHERE order_number = ?")
+    .run(new Date(Date.now() - 60_000).toISOString(), orderNumber);
+
+  backend.expirePaymentReservations();
+  backend.expirePaymentReservations();
+
+  assert.equal(db.prepare("SELECT status FROM orders WHERE order_number = ?").get(orderNumber).status, "failed");
+  assert.equal(db.prepare("SELECT payment_status FROM orders WHERE order_number = ?").get(orderNumber).payment_status, "expired");
+  assert.equal(db.prepare("SELECT quantity FROM inventory WHERE product_id = 'test-bowl'").get().quantity, 5);
+  assert.equal(db.prepare("SELECT status FROM order_inventory WHERE order_number = ?").get(orderNumber).status, "released");
+  assert.equal(db.prepare("SELECT used_count FROM coupons WHERE code = 'FOOD25'").get().used_count, 0);
+});
+
+test("reservation expiry never releases inventory for an already-paid payment state", async t => {
+  const { backend, db } = await fixture(t);
+  const orderNumber = "FH-PAID-EXPIRY";
+  db.prepare("UPDATE inventory SET quantity = 5 WHERE product_id = 'test-bowl'").run();
+  backend.reserveInventory(orderNumber, [{ productId: "test-bowl", quantity: 2 }], 20);
+  backend.claimCoupon("FOOD25", orderNumber);
+  db.prepare("INSERT INTO orders (order_number, created_at, status, payment_status, items_json, total, coupon_code) VALUES (?, ?, 'payment_pending', 'paid', '[]', 200, 'FOOD25')")
+    .run(orderNumber, new Date().toISOString());
+  db.prepare("UPDATE order_inventory SET expires_at = ? WHERE order_number = ?")
+    .run(new Date(Date.now() - 60_000).toISOString(), orderNumber);
+
+  backend.expirePaymentReservations();
+
+  assert.equal(db.prepare("SELECT status FROM orders WHERE order_number = ?").get(orderNumber).status, "payment_pending");
+  assert.equal(db.prepare("SELECT payment_status FROM orders WHERE order_number = ?").get(orderNumber).payment_status, "paid");
+  assert.equal(db.prepare("SELECT quantity FROM inventory WHERE product_id = 'test-bowl'").get().quantity, 3);
+  assert.equal(db.prepare("SELECT status FROM order_inventory WHERE order_number = ?").get(orderNumber).status, "held");
+  assert.equal(db.prepare("SELECT used_count FROM coupons WHERE code = 'FOOD25'").get().used_count, 1);
+});
 
 test("late payment.failed webhook cannot release inventory or coupons for a paid order", async t => {
   const { base, db, backend } = await fixture(t);

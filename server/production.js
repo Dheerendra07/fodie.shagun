@@ -281,7 +281,9 @@ function createProductionBackend(options) {
         user: { id, name, email, phone, createdAt }
       });
     } catch (error) {
-      if (String(error.code || "").startsWith("SQLITE_CONSTRAINT")) return res.status(409).json({ error: "An account already exists with that email address or mobile number." });
+      if (["SQLITE_CONSTRAINT_UNIQUE", "SQLITE_CONSTRAINT_PRIMARYKEY"].includes(error.code)) {
+        return res.status(409).json({ error: "An account already exists with that email address or mobile number." });
+      }
       return res.status(500).json({ error: "Account registration could not be completed." });
     }
   }
@@ -529,9 +531,14 @@ function createProductionBackend(options) {
     if (!expired.length) return;
     const expire = db.transaction(() => {
       for (const item of expired) {
+        const failed = db.prepare([
+          "UPDATE orders SET status = 'failed', payment_status = 'expired'",
+          "WHERE order_number = ? AND status = 'payment_pending'",
+          "AND payment_status IN ('created', 'authorized', 'pending')"
+        ].join(" ")).run(item.order_number);
+        if (!failed.changes) continue;
         releaseInventory(item.order_number);
         releaseCoupon(item.order_number);
-        db.prepare("UPDATE orders SET status = 'failed', payment_status = 'expired' WHERE order_number = ? AND status = 'payment_pending'").run(item.order_number);
       }
     });
     expire();
