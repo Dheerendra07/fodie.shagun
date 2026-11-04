@@ -12,6 +12,7 @@ async function fixture(t) {
     ADMIN_EMAIL: process.env.ADMIN_EMAIL,
     ADMIN_PASSWORD_HASH: process.env.ADMIN_PASSWORD_HASH,
     RAZORPAY_WEBHOOK_SECRET: process.env.RAZORPAY_WEBHOOK_SECRET,
+    AUTH_TOKEN_TTL_SECONDS: process.env.AUTH_TOKEN_TTL_SECONDS,
     NODE_ENV: process.env.NODE_ENV
   };
   process.env.NODE_ENV = "test";
@@ -76,9 +77,21 @@ test("customer registration creates a signed session and protected profile", asy
   assert.equal((await profile.json()).user.name, "Test Customer");
   const rejected = await fetch(base + "/api/auth/me");
   assert.equal(rejected.status, 401);
+  const adminArea = await fetch(base + "/api/admin/inventory", {
+    headers: { Authorization: "Bearer " + account.token }
+  });
+  assert.equal(adminArea.status, 401);
+  const logout = await post(base, "/api/auth/logout", {}, account.token);
+  assert.equal(logout.status, 200);
+  const revokedProfile = await fetch(base + "/api/auth/me", {
+    headers: { Authorization: "Bearer " + account.token }
+  });
+  assert.equal(revokedProfile.status, 401);
+  const repeatedLogout = await post(base, "/api/auth/logout", {}, account.token);
+  assert.equal(repeatedLogout.status, 401);
 });
 
-test("admin login issues a session accepted by protected inventory API", async t => {
+test("admin login issues a role-isolated revocable session", async t => {
   const { base } = await fixture(t);
   const login = await post(base, "/api/admin/auth/login", { email: "admin@example.test", password: "FoodieHubTestPass123!" });
   assert.equal(login.status, 200);
@@ -87,6 +100,10 @@ test("admin login issues a session accepted by protected inventory API", async t
   const inventory = await fetch(base + "/api/admin/inventory", { headers: { Authorization: "Bearer " + session.token } });
   assert.equal(inventory.status, 200);
   assert.equal((await inventory.json()).inventory[0].productId, "test-bowl");
+  const customerArea = await fetch(base + "/api/auth/me", {
+    headers: { Authorization: "Bearer " + session.token }
+  });
+  assert.equal(customerArea.status, 401);
 });
 
 test("coupon validation is database-backed and usage can be released", async t => {
@@ -108,14 +125,43 @@ test("inventory is reserved atomically and restored on cancellation", async t =>
   assert.equal(db.prepare("SELECT quantity FROM inventory WHERE product_id = 'test-bowl'").get().quantity, 5);
 });
 
-test("JWT tokens reject a modified signature", async () => {
+test("JWT verification rejects altered, non-canonical and oversized tokens", async () => {
   const secret = "this-is-a-long-test-signing-secret";
   const token = createProductionBackend.signToken({ sub: "user-1", role: "customer", exp: Math.floor(Date.now() / 1000) + 60 }, secret);
   assert.equal(createProductionBackend.verifyToken(token, secret).sub, "user-1");
   const parts = token.split(".");
   parts[2] = (parts[2][0] === "A" ? "B" : "A") + parts[2].slice(1);
-  const changed = parts.join(".");
-  assert.equal(createProductionBackend.verifyToken(changed, secret), null);
+  assert.equal(createProductionBackend.verifyToken(parts.join("."), secret), null);
+
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_";
+  const signature = token.split(".")[2];
+  const lastIndex = alphabet.indexOf(signature.at(-1));
+  const equivalentIndex = alphabet.split("").findIndex((character, index) =>
+    index !== lastIndex && (index >> 2) === (lastIndex >> 2)
+  );
+  assert.notEqual(equivalentIndex, -1);
+  const equivalentSignature = signature.slice(0, -1) + alphabet[equivalentIndex];
+  assert.deepEqual(
+    Buffer.from(equivalentSignature, "base64url"),
+    Buffer.from(signature, "base64url")
+  );
+  const nonCanonical = token.split(".");
+  nonCanonical[2] = equivalentSignature;
+  assert.equal(createProductionBackend.verifyToken(nonCanonical.join("."), secret), null);
+  assert.equal(createProductionBackend.verifyToken(token + "x".repeat(8192), secret), null);
+  assert.equal(createProductionBackend.verifyToken(token + "=", secret), null);
+});
+
+test("customer registration rolls back the account and session when audit persistence fails", async t => {
+  const { base, db } = await fixture(t);
+  db.exec("CREATE TRIGGER reject_customer_audit BEFORE INSERT ON audit_logs BEGIN SELECT RAISE(ABORT, 'audit store unavailable'); END;");
+  const response = await post(base, "/api/auth/register", {
+    name: "Atomic Customer", email: "atomic@example.test",
+    phone: "9876543211", password: "CustomerTestPass123!"
+  });
+  assert.equal(response.status, 500);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM users WHERE email = ?").get("atomic@example.test").count, 0);
+  assert.equal(db.prepare("SELECT COUNT(*) AS count FROM auth_sessions").get().count, 0);
 });
 
 

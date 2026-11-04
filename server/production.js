@@ -52,15 +52,19 @@ function signToken(payload, secret) {
 
 function verifyToken(token, secret) {
   try {
-    const parts = String(token || "").split(".");
-    if (parts.length !== 3) return null;
+    if (typeof token !== "string" || token.length > 8192) return null;
+    const parts = token.split(".");
+    if (parts.length !== 3 || parts.some(part => !/^[A-Za-z0-9_-]+$/.test(part))) return null;
     const input = parts[0] + "." + parts[1];
     const expected = crypto.createHmac("sha256", secret).update(input).digest();
     const received = Buffer.from(parts[2], "base64url");
+    if (received.length !== 32 || received.toString("base64url") !== parts[2]) return null;
     if (expected.length !== received.length || !crypto.timingSafeEqual(expected, received)) return null;
     const header = JSON.parse(Buffer.from(parts[0], "base64url").toString("utf8"));
     const payload = JSON.parse(Buffer.from(parts[1], "base64url").toString("utf8"));
-    if (header.alg !== "HS256" || !payload.exp || payload.exp <= Math.floor(Date.now() / 1000)) return null;
+    if (!header || header.alg !== "HS256" || header.typ !== "JWT" ||
+        !payload || typeof payload !== "object" || Array.isArray(payload) ||
+        !Number.isSafeInteger(payload.exp) || payload.exp <= Math.floor(Date.now() / 1000)) return null;
     return payload;
   } catch (_) {
     return null;
@@ -94,7 +98,10 @@ function createProductionBackend(options) {
   const requireAdmin = options.requireAdmin;
   const razorpayRequest = options.razorpayRequest;
   const secret = process.env.JWT_SECRET || crypto.randomBytes(48).toString("hex");
-  const sessionSeconds = Math.max(3600, Math.min(2592000, Number(process.env.AUTH_TOKEN_TTL_SECONDS || 604800)));
+  const configuredSessionSeconds = Number(process.env.AUTH_TOKEN_TTL_SECONDS || 604800);
+  const sessionSeconds = Number.isSafeInteger(configuredSessionSeconds)
+    ? Math.max(3600, Math.min(2592000, configuredSessionSeconds))
+    : 604800;
 
   if (process.env.NODE_ENV === "production") {
     if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
@@ -181,6 +188,9 @@ function createProductionBackend(options) {
   ].forEach(item => seedCoupon.run(item[0], item[1], item[2], item[3], item[4], seededAt, seededAt));
 
   function createSession(subjectId, role) {
+    if (typeof subjectId !== "string" || !subjectId.trim() || !["customer", "admin"].includes(role)) {
+      throw new Error("A valid session subject and role are required.");
+    }
     const issuedAt = Math.floor(Date.now() / 1000);
     const expiresAt = issuedAt + sessionSeconds;
     const jti = crypto.randomUUID();
@@ -192,9 +202,14 @@ function createProductionBackend(options) {
 
   function lookupSession(token) {
     const claims = verifyToken(token, secret);
-    if (!claims || !claims.jti || !claims.sub || !claims.role) return null;
+    if (!claims || typeof claims.jti !== "string" || !claims.jti ||
+        typeof claims.sub !== "string" || !claims.sub ||
+        !["customer", "admin"].includes(claims.role) ||
+        !Number.isSafeInteger(claims.exp)) return null;
     const session = db.prepare("SELECT jti, subject_id, role, expires_at, revoked_at FROM auth_sessions WHERE jti = ?").get(claims.jti);
-    if (!session || session.revoked_at || Date.parse(session.expires_at) <= Date.now()) return null;
+    if (!session || session.revoked_at) return null;
+    const storedExpiry = Date.parse(session.expires_at);
+    if (!Number.isFinite(storedExpiry) || storedExpiry !== claims.exp * 1000 || storedExpiry <= Date.now()) return null;
     if (session.subject_id !== claims.sub || session.role !== claims.role) return null;
     return claims;
   }
@@ -254,10 +269,13 @@ function createProductionBackend(options) {
     const id = crypto.randomUUID();
     try {
       const passwordHash = await hashPassword(password);
-      db.prepare("INSERT INTO users (id, name, email, phone, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
-        .run(id, name, email, phone, passwordHash, createdAt, createdAt);
-      const session = createSession(id, "customer");
-      audit(id, "customer.registered", "user", id);
+      const session = db.transaction(() => {
+        db.prepare("INSERT INTO users (id, name, email, phone, password_hash, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)")
+          .run(id, name, email, phone, passwordHash, createdAt, createdAt);
+        const createdSession = createSession(id, "customer");
+        audit(id, "customer.registered", "user", id);
+        return createdSession;
+      })();
       return res.status(201).json({
         ...session,
         user: { id, name, email, phone, createdAt }
@@ -281,7 +299,11 @@ function createProductionBackend(options) {
     if (!user || !user.is_active || !(await verifyPassword(password, user.password_hash))) {
       return res.status(401).json({ error: "Email or password is incorrect." });
     }
-    const session = createSession(user.id, "customer");
+    const session = db.transaction(() => {
+      const createdSession = createSession(user.id, "customer");
+      audit(user.id, "customer.login", "user", user.id);
+      return createdSession;
+    })();
     return res.json({
       ...session,
       user: { id: user.id, name: user.name, email: user.email, phone: user.phone, createdAt: user.created_at }
@@ -394,8 +416,11 @@ function createProductionBackend(options) {
       if (email !== expectedEmail || !(await verifyPassword(password, passwordHash))) {
         return res.status(401).json({ error: "Admin email or password is incorrect." });
       }
-      const session = createSession("foodiehub-admin", "admin");
-      audit("foodiehub-admin", "admin.login", "session", "foodiehub-admin");
+      const session = db.transaction(() => {
+        const createdSession = createSession("foodiehub-admin", "admin");
+        audit("foodiehub-admin", "admin.login", "session", "foodiehub-admin");
+        return createdSession;
+      })();
       return res.json({ ...session, role: "admin" });
     } catch (error) {
       return res.status(error.status || 500).json({
