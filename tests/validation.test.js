@@ -68,7 +68,7 @@ test("normalizes coupon codes and rejects invalid formats or types", () => {
   assert.equal(validation.normalizeCouponCode(undefined), "");
   assert.throws(() => validation.normalizeCouponCode(250), /must be text/i);
   assert.throws(() => validation.normalizeCouponCode("AB"), /3 to 24/i);
-  assert.throws(() => validation.normalizeCouponCode("BAD CODE"), /unsupported characters/i);
+  assert.throws(() => validation.normalizeCouponCode("BAD CODE"), /may contain only/i);
   assert.throws(() => validation.normalizeCouponCode("", true), /required/i);
 });
 
